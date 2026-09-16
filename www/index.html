@@ -1,0 +1,810 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+
+    <meta name="theme-color" content="#0f1117">
+
+    <title>Expense Tracker</title>
+
+    <link rel="stylesheet" href="css/base.css">
+    <link rel="stylesheet" href="css/components.css">
+    <link rel="stylesheet" href="css/navigation.css">
+    <link rel="stylesheet" href="css/pages.css">
+    <link rel="stylesheet" href="css/responsive.css">
+</head>
+
+<body>
+
+<div id="app">
+
+    
+
+
+    <!-- =========================
+         MAIN CONTENT
+    ========================== -->
+
+    <main id="page-container">
+
+        <!-- HOME -->
+        <section class="page active" id="home-page">
+
+            <div class="page-title-minimal">
+                <h2>Overview</h2>
+            </div>
+
+            <div class="balance-card">
+                <div class="balance-card-top">
+                    <span>Total Balance</span>
+
+                    <button class="balance-more">•••</button>
+                </div>
+
+                <h2 id="total-balance">₹0</h2>
+
+                <div class="balance-summary">
+
+                    <div>
+                        <span class="summary-label">
+                            <span class="income-dot"></span>
+                            Income
+                        </span>
+
+                        <strong id="total-income">₹0</strong>
+                    </div>
+
+                    <div>
+                        <span class="summary-label">
+                            <span class="expense-dot"></span>
+                            Expenses
+                        </span>
+
+                        <strong id="total-expenses">₹0</strong>
+                    </div>
+
+                </div>
+            </div>
+
+
+            <!-- MONTHLY BUDGET -->
+
+            <div class="section-heading">
+                <div>
+                    <h2>Monthly spending</h2>
+                    <p id="current-month">August 2026</p>
+                </div>
+
+                <button class="text-button" id="budgetBtn">
+                    Budget
+                </button>
+            </div>
+
+            <div class="budget-card">
+
+                <div class="budget-header">
+                    <div>
+                        <span>Spent</span>
+                        <strong id="budget-spent">₹0</strong>
+                    </div>
+
+                    <div class="budget-limit">
+                        <span>Budget</span>
+                        <strong id="budget-total">₹20,000</strong>
+                    </div>
+                </div>
+
+                <div class="progress-track">
+                    <div class="progress-bar" id="budget-progress"></div>
+                </div>
+
+                <div class="budget-footer">
+                    <span id="budget-percent">0% used</span>
+                    <span id="budget-remaining">₹20,000 remaining</span>
+                </div>
+
+            </div>
+
+
+            <!-- QUICK ACTIONS -->
+
+            <div class="quick-actions">
+
+                <button class="quick-action expense-action" id="addExpenseBtn">
+                    <svg class="quick-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                    <span>Add Expense</span>
+                </button>
+
+                <button class="quick-action income-action" id="addIncomeBtn">
+                    <svg class="quick-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                    <span>Add Income</span>
+                </button>
+
+            </div>
+
+
+            <!-- RECENT TRANSACTIONS -->
+
+            <div class="section-heading">
+                <div>
+                    <h2>Recent transactions</h2>
+                    <p>Your latest activity</p>
+                </div>
+
+                <button class="text-button" id="viewAllBtn">
+                    View all
+                </button>
+            </div>
+
+            <div id="recent-transactions" class="transaction-list">
+                <!-- JS -->
+            </div>
+
+
+            <!-- CATEGORY PREVIEW -->
+
+            <div class="section-heading">
+                <div>
+                    <h2>Spending by category</h2>
+                    <p>This month</p>
+                </div>
+            </div>
+
+            <div id="home-categories" class="category-list">
+                <!-- JS -->
+            </div>
+
+        </section>
+
+
+        <!-- =========================
+             TRANSACTIONS
+        ========================== -->
+
+        <section class="page" id="transactions-page">
+
+            <div class="page-title-minimal">
+                <h2>Transactions</h2>
+            </div>
+
+            <div class="page-toolbar">
+
+                <div class="search-box">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px;margin-right:8px;color:var(--text-muted);"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                    <input
+                        type="search"
+                        id="transactionSearch"
+                        placeholder="Search transactions..."
+                    >
+                </div>
+
+            </div>
+
+
+            <div class="filter-row">
+
+                <button class="filter-chip active" data-filter="all">
+                    All
+                </button>
+
+                <button class="filter-chip" data-filter="expense">
+                    Expenses
+                </button>
+
+                <button class="filter-chip" data-filter="income">
+                    Income
+                </button>
+
+            </div>
+
+
+            <div class="filter-row secondary-filters">
+
+                <button class="filter-chip small active" data-date-filter="all">
+                    All time
+                </button>
+
+                <button class="filter-chip small" data-date-filter="month">
+                    This month
+                </button>
+
+                <button class="filter-chip small" data-date-filter="week">
+                    This week
+                </button>
+
+            </div>
+
+
+            <div id="all-transactions" class="transaction-history">
+                <!-- JS -->
+            </div>
+
+        </section>
+
+
+        <!-- =========================
+             ANALYSIS
+        ========================== -->
+
+        <section class="page" id="analysis-page">
+
+            <div class="page-title-minimal">
+                <h2>Analysis</h2>
+            </div>
+
+            <div class="analysis-header">
+
+                <div>
+                    <p>Financial overview</p>
+                    <h2 id="analysis-month">August 2026</h2>
+                </div>
+
+                <button class="month-selector" id="monthSelector">
+                    This month ▾
+                </button>
+
+            </div>
+
+
+            <!-- ANALYSIS SUMMARY -->
+
+            <div class="analysis-summary">
+
+                <div class="stat-card">
+                    <span>Total spent</span>
+                    <strong id="analysis-expense">₹0</strong>
+                    <small id="expense-change">This month</small>
+                </div>
+
+                <div class="stat-card">
+                    <span>Total income</span>
+                    <strong id="analysis-income">₹0</strong>
+                    <small>This month</small>
+                </div>
+
+            </div>
+
+
+            <!-- SPENDING CHART -->
+
+            <div class="chart-card">
+
+                <div class="card-heading">
+                    <div>
+                        <h3>Spending activity</h3>
+                        <p>Daily expenses</p>
+                    </div>
+                </div>
+
+                <div class="chart-wrapper" style="position: relative; height: 240px; width: 100%; margin-top: 16px;"><canvas id="spendingChartCanvas"></canvas></div>
+
+            </div>
+
+
+            <!-- CATEGORY CHART -->
+
+            <div class="chart-card">
+
+                <div class="card-heading">
+                    <div>
+                        <h3>Where your money goes</h3>
+                        <p>Category breakdown</p>
+                    </div>
+                </div>
+
+                <div class="donut-section">
+
+                    <div style="position: relative; height: 250px; width: 100%; margin-bottom: 24px;"><canvas id="categoryChartCanvas"></canvas></div>
+                    </div>
+
+                    <div id="category-legend" class="category-legend">
+                        <!-- JS -->
+                    </div>
+
+                </div>
+
+            </div>
+
+
+            <!-- INSIGHTS -->
+
+            <div class="section-heading">
+                <div>
+                    <h2>Insights</h2>
+                    <p>Based on your activity</p>
+                </div>
+            </div>
+
+            <div id="insights" class="insights-list">
+                <!-- JS -->
+            </div>
+
+        </section>
+
+
+        <!-- =========================
+             SETTINGS
+        ========================== -->
+
+        <section class="page" id="settings-page">
+
+            <div class="page-title-minimal">
+                <h2>Settings</h2>
+            </div>
+
+            <div class="settings-section">
+
+                <h3>Preferences</h3>
+
+                <div class="settings-card">
+
+                    <button class="settings-item" id="appearanceSetting">
+                        <div class="settings-icon">◐</div>
+
+                        <div class="settings-text">
+                            <strong>Appearance</strong>
+                            <span id="appearanceValue">System default</span>
+                        </div>
+
+                        <span class="settings-arrow">›</span>
+                    </button>
+
+
+                    <button class="settings-item" id="currencySetting">
+                        <div class="settings-icon">₹</div>
+
+                        <div class="settings-text">
+                            <strong>Currency</strong>
+                            <span>Indian Rupee (₹)</span>
+                        </div>
+
+                        <span class="settings-arrow">›</span>
+                    </button>
+
+                </div>
+
+            </div>
+
+
+            <div class="settings-section">
+
+                <h3>Budget</h3>
+
+                <div class="settings-card">
+
+                    <button class="settings-item" id="monthlyBudgetSetting">
+
+                        <div class="settings-icon">◫</div>
+
+                        <div class="settings-text">
+                            <strong>Monthly budget</strong>
+                            <span id="settingsBudgetValue">₹20,000</span>
+                        </div>
+
+                        <span class="settings-arrow">›</span>
+
+                    </button>
+
+                </div>
+
+            </div>
+
+
+            <div class="settings-section">
+
+                <h3>Categories</h3>
+
+                <div class="settings-card">
+
+                    <button class="settings-item" id="manageCategoriesBtn">
+
+                        <div class="settings-icon">⌘</div>
+
+                        <div class="settings-text">
+                            <strong>Manage categories</strong>
+                            <span>Customize your categories</span>
+                        </div>
+
+                        <span class="settings-arrow">›</span>
+
+                    </button>
+
+                </div>
+
+            </div>
+
+
+            <div class="settings-section">
+
+                <h3>SMS tracking</h3>
+
+                <div class="settings-card">
+
+                    <div class="settings-item">
+
+                        <div class="settings-icon">✉</div>
+
+                        <div class="settings-text">
+                            <strong>SMS transaction detection</strong>
+                            <span>Available when installed as a mobile app</span>
+                        </div>
+
+                        <label class="switch">
+                            <input type="checkbox" disabled>
+                            <span class="slider"></span>
+                        </label>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+
+            <div class="settings-section">
+
+                <h3>Data</h3>
+
+                <div class="settings-card">
+
+                    <button class="settings-item" id="exportDataBtn">
+
+                        <div class="settings-icon">↑</div>
+
+                        <div class="settings-text">
+                            <strong>Export data</strong>
+                            <span>Save your transactions</span>
+                        </div>
+
+                        <span class="settings-arrow">›</span>
+
+                    </button>
+
+
+                    <button class="settings-item" id="importDataBtn">
+
+                        <div class="settings-icon">↓</div>
+
+                        <div class="settings-text">
+                            <strong>Import data</strong>
+                            <span>Restore your transactions</span>
+                        </div>
+
+                        <span class="settings-arrow">›</span>
+
+                    </button>
+
+                    <input
+                        type="file"
+                        id="importFile"
+                        accept=".json"
+                        hidden
+                    >
+
+                </div>
+
+            </div>
+
+
+            <div class="settings-section danger-section">
+
+                <div class="settings-card">
+
+                    <button class="settings-item danger" id="clearDataBtn">
+
+                        <div class="settings-icon">⌫</div>
+
+                        <div class="settings-text">
+                            <strong>Clear all data</strong>
+                            <span>Delete all stored transactions</span>
+                        </div>
+
+                        <span class="settings-arrow">›</span>
+
+                    </button>
+
+                </div>
+
+            </div>
+
+
+            <div class="app-version">
+                Expense Tracker<br>
+                <span>Version 1.0.0</span>
+            </div>
+
+        </section>
+
+    </main>
+
+
+    <!-- =========================
+         FLOATING ADD BUTTON
+    ========================== -->
+
+    <button class="floating-add" id="floatingAddBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:32px;height:32px;"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg></button>
+
+
+    <!-- =========================
+         BOTTOM NAVIGATION
+    ========================== -->
+
+    <nav class="bottom-nav">
+
+        <button class="nav-item active" data-page="home">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+            <span>Home</span>
+        </button>
+
+        <button class="nav-item" data-page="transactions">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>
+            <span>Transactions</span>
+        </button>
+
+        <button class="nav-item" data-page="analysis">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><path d="M12 2v10l7.5 4.5"></path></svg>
+            <span>Analysis</span>
+        </button>
+
+        <button class="nav-item" data-page="settings">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+            <span>Settings</span>
+        </button>
+
+    </nav>
+
+
+    <!-- =========================
+         TRANSACTION MODAL
+    ========================== -->
+
+    <div class="modal-overlay" id="transactionModal">
+
+        <div class="modal">
+
+            <div class="modal-handle"></div>
+
+            <div class="modal-header">
+
+                <div>
+                    <p id="modalSubtitle">New transaction</p>
+                    <h2 id="modalTitle">Add Expense</h2>
+                </div>
+
+                <button class="modal-close" id="closeTransactionModal">
+                    ×
+                </button>
+
+            </div>
+
+
+            <div class="transaction-type">
+
+                <button
+                    class="type-button active"
+                    data-type="expense"
+                    id="expenseTypeBtn">
+                    Expense
+                </button>
+
+                <button
+                    class="type-button"
+                    data-type="income"
+                    id="incomeTypeBtn">
+                    Income
+                </button>
+
+            </div>
+
+
+            <form id="transactionForm">
+
+                <label class="form-label">
+                    Amount
+
+                    <div class="amount-input">
+                        <span>₹</span>
+
+                        <input
+                            type="number"
+                            id="amountInput"
+                            placeholder="0"
+                            min="0"
+                            step="0.01"
+                            required
+                        >
+                    </div>
+                </label>
+
+
+                <label class="form-label">
+                    Title / Merchant
+
+                    <input
+                        type="text"
+                        id="merchantInput"
+                        placeholder="e.g. Amazon or Groceries"
+                    >
+                </label>
+
+
+                <label class="form-label">
+                    Category
+
+                    <select id="categoryInput">
+                    </select>
+
+                </label>
+
+
+                <div class="form-row">
+
+                    <label class="form-label">
+                        Date
+
+                        <input
+                            type="date"
+                            id="dateInput"
+                            required
+                        >
+                    </label>
+
+                    <label class="form-label" style="display: none;">
+                    Time
+
+                        <input
+                            type="time"
+                            id="timeInput"
+                        >
+                    </label>
+
+                </div>
+
+
+                <label class="form-label" style="display: none;">
+                    Account
+
+                    <input
+                        type="text"
+                        id="accountInput"
+                        placeholder="e.g. HDFC Bank"
+                    >
+                </label>
+
+
+                <label class="form-label">
+                    Note
+
+                    <textarea
+                        id="noteInput"
+                        rows="2"
+                        placeholder="Optional note..."
+                    ></textarea>
+                </label>
+
+
+                <button
+                    type="submit"
+                    class="primary-button"
+                    id="saveTransactionBtn">
+                    Save transaction
+                </button>
+
+            </form>
+
+        </div>
+
+    </div>
+
+
+    <!-- =========================
+         TRANSACTION DETAILS MODAL
+    ========================== -->
+
+    <div class="modal-overlay" id="detailsModal">
+
+        <div class="modal details-modal">
+
+            <div class="modal-handle"></div>
+
+            <div class="modal-header">
+
+                <div>
+                    <p>Transaction details</p>
+                    <h2 id="detailsMerchant">Transaction</h2>
+                </div>
+
+                <button class="modal-close" id="closeDetailsModal">
+                    ×
+                </button>
+
+            </div>
+
+
+            <div class="details-amount" id="detailsAmount">
+                ₹0
+            </div>
+
+            <div class="details-type" id="detailsType">
+                Expense
+            </div>
+
+
+            <div class="details-list">
+
+                <div class="detail-row">
+                    <span>Category</span>
+                    <strong id="detailsCategory">—</strong>
+                </div>
+
+                <div class="detail-row">
+                    <span>Date</span>
+                    <strong id="detailsDate">—</strong>
+                </div>
+
+                <div class="detail-row">
+                    <span>Time</span>
+                    <strong id="detailsTime">—</strong>
+                </div>
+
+                <div class="detail-row">
+                    <span>Account</span>
+                    <strong id="detailsAccount">—</strong>
+                </div>
+
+                <div class="detail-row">
+                    <span>Note</span>
+                    <strong id="detailsNote">—</strong>
+                </div>
+
+                <div class="detail-row">
+                    <span>Source</span>
+                    <strong id="detailsSource">—</strong>
+                </div>
+
+            </div>
+
+
+            <div class="details-actions">
+
+                <button class="secondary-button" id="editTransactionBtn">
+                    Edit
+                </button>
+
+                <button class="danger-button" id="deleteTransactionBtn">
+                    Delete
+                </button>
+
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <!-- =========================
+         TOAST
+    ========================== -->
+
+    <div id="toast" class="toast">
+        <span id="toastMessage"></span>
+    </div>
+
+</div>
+
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="js/dummy-data.js"></script>
+<script src="js/db.js"></script>
+<script src="js/state.js"></script>
+<script src="js/utils.js"></script>
+<script src="js/transactions.js"></script>
+<script src="js/analytics.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/app.js"></script>
+<script src="js/sms.js"></script>
+
+</body>
+</html>

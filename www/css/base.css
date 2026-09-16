@@ -1,0 +1,74 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+:root {
+    /* 60% Dominant */
+    --bg-dominant: #F9F8F6;
+    --surface: #FFFFFF;
+    
+    /* 30% Secondary */
+    --bg-secondary: #E3E8E1;
+    --border-soft: #D4D9D2;
+    
+    /* 10% Accent */
+    --accent: #E07A5F;
+    --accent-hover: #D0694E;
+    
+    /* Status & Text */
+    --text-main: #2C363F;
+    --text-muted: #6B7280;
+    --income: #4E876C;
+    --expense: #E07A5F;
+    
+    /* Styling */
+    --radius-lg: 24px;
+    --radius-md: 16px;
+    --radius-sm: 8px;
+    --shadow-soft: 0 8px 24px rgba(44, 54, 63, 0.06);
+    
+    --font-main: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
+}
+
+body {
+    background-color: var(--bg-dominant);
+    color: var(--text-main);
+    font-family: var(--font-main);
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+}
+
+#app {
+    max-width: 600px;
+    margin: 0 auto;
+    min-height: 100vh;
+    background-color: var(--bg-dominant);
+    position: relative;
+    box-shadow: var(--shadow-soft);
+}
+
+.page {
+    display: none;
+    padding-bottom: 140px;
+    animation: fadeIn 0.4s ease-out;
+}
+
+.page.active {
+    display: block;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+h1, h2, h3, h4 {
+    color: var(--text-main);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+}
