@@ -169,7 +169,8 @@ public class MainActivity extends AppCompatActivity {
             }
 
             JSONArray messages = new JSONArray();
-            int max = limit > 0 ? limit : 200;
+            // If limit <= 0, fetch all available messages (up to 50,000 safety threshold)
+            int max = limit > 0 ? limit : 50000;
 
             Uri[] candidateUris = new Uri[]{
                     Uri.parse("content://sms/inbox"),

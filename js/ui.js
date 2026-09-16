@@ -323,37 +323,30 @@ function createTransactionElement(
             : "expense";
 
 
-    item.innerHTML = `
+    const accountBadge = transaction.account
+        ? `<span class="tx-account-badge">${typeof getBankIcon === "function" ? getBankIcon(transaction.account) : ""}<span>${escapeHTML(transaction.account)}</span></span>`
+        : "";
 
+    item.innerHTML = `
         <div class="transaction-icon">
             ${getCategoryIcon(transaction.category)}
         </div>
 
         <div class="transaction-info">
+            <div class="transaction-title-row">
+                <strong class="transaction-merchant">${escapeHTML(transaction.merchant || transaction.category)}</strong>
+                <div class="transaction-amount ${amountClass}">
+                    ${sign}${formatCurrency(transaction.amount)}
+                </div>
+            </div>
 
-            <strong>
-                ${escapeHTML(
-                    transaction.merchant ||
-                    transaction.category
-                )}
-            </strong>
-
-            <span>
-                ${escapeHTML(transaction.category)}
-                ·
-                ${formatShortDate(transaction.date)}
-                ${transaction.time
-                    ? " · " + transaction.time
-                    : ""}
-                ${transaction.account ? ` · <span class="tx-account-badge">${typeof getBankIcon === "function" ? getBankIcon(transaction.account) : ""} <span>${escapeHTML(transaction.account)}</span></span>` : ""}
-            </span>
-
+            <div class="transaction-meta-row">
+                <span class="tx-meta-text">
+                    ${escapeHTML(transaction.category)} · ${formatShortDate(transaction.date)}${transaction.time ? " · " + transaction.time : ""}
+                </span>
+                ${accountBadge}
+            </div>
         </div>
-
-        <div class="transaction-amount ${amountClass}">
-            ${sign}${formatCurrency(transaction.amount)}
-        </div>
-
     `;
 
 

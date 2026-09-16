@@ -263,9 +263,10 @@ async function syncDeviceSmsInbox(forceFullSync = false, isSilent = false) {
 
             let rawJson;
             if (typeof window.AndroidBridge.readInboxSmsSince === "function") {
-                rawJson = window.AndroidBridge.readInboxSmsSince(lastSyncTs, 250);
+                // 0 limit indicates fetch all messages
+                rawJson = window.AndroidBridge.readInboxSmsSince(lastSyncTs, 0);
             } else {
-                rawJson = window.AndroidBridge.readInboxSms(250);
+                rawJson = window.AndroidBridge.readInboxSms(0);
             }
 
             if (rawJson === "PERMISSION_REQUESTED") {
