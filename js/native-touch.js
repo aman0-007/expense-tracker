@@ -1,62 +1,32 @@
 /* =========================================================
-   NATIVE TOUCH & GESTURE OPTIMIZATIONS
-   Disables pinch-to-zoom, suppresses double-tap zoom,
-   and enables native Android haptic feel.
+   NATIVE TOUCH & INTERACTION CONTROLS
+   Native Android haptic feel, ripple feedback,
+   and unblocked click & touch responsiveness.
 ========================================================= */
 
 (function() {
     'use strict';
 
-    // 1. Suppress pinch zoom gestures (Safari & WebKit WebViews)
-    document.addEventListener('gesturestart', function(e) {
-        e.preventDefault();
-    }, { passive: false });
-
-    document.addEventListener('gesturechange', function(e) {
-        e.preventDefault();
-    }, { passive: false });
-
-    document.addEventListener('gestureend', function(e) {
-        e.preventDefault();
-    }, { passive: false });
-
-    // 2. Prevent multi-touch zoom on Android & iOS WebViews
-    document.addEventListener('touchstart', function(e) {
-        if (e.touches.length > 1) {
-            e.preventDefault();
-        }
-    }, { passive: false });
-
-    // 3. Prevent double-tap to zoom on mobile screens while allowing normal double clicks on text
-    let lastTouchEnd = 0;
-    document.addEventListener('touchend', function(e) {
-        const now = Date.now();
-        const target = e.target;
-        const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable;
-        
-        if (!isInput && now - lastTouchEnd <= 320) {
-            e.preventDefault();
-        }
-        lastTouchEnd = now;
-    }, { passive: false });
-
-    // 4. Subtle Android haptic feedback utility
+    // 1. Safe Android haptic feedback utility
     window.triggerNativeHaptic = function(intensity = 'light') {
         try {
             if (window.AndroidBridge && typeof window.AndroidBridge.vibrate === 'function') {
-                window.AndroidBridge.vibrate(intensity === 'heavy' ? 40 : (intensity === 'medium' ? 25 : 12));
+                const ms = intensity === 'heavy' ? 35 : (intensity === 'medium' ? 20 : 10);
+                window.AndroidBridge.vibrate(ms);
             } else if (window.navigator && typeof window.navigator.vibrate === 'function') {
-                window.navigator.vibrate(intensity === 'heavy' ? 40 : (intensity === 'medium' ? 25 : 12));
+                const ms = intensity === 'heavy' ? 35 : (intensity === 'medium' ? 20 : 10);
+                window.navigator.vibrate(ms);
             }
         } catch (_) {
             // Ignore if vibration is blocked or unsupported
         }
     };
 
-    // 5. Attach haptic feedback on interactive controls
+    // 2. Attach lightweight haptic feedback on interactive controls
     document.addEventListener('DOMContentLoaded', function() {
         const interactiveSelectors = [
             'button',
+            'a',
             '.type-button',
             '.cat-pill',
             '.account-chip',
@@ -64,7 +34,9 @@
             '.nav-item',
             '.transaction-item',
             '.settings-item',
-            '.sugg-chip'
+            '.sugg-chip',
+            '.floating-add',
+            '.modal-close'
         ];
 
         document.body.addEventListener('click', function(e) {
@@ -72,12 +44,13 @@
             if (btn) {
                 window.triggerNativeHaptic('light');
             }
-        });
+        }, { passive: true });
     });
 
-    // 6. Check if running inside native Android WebView
+    // 3. Check if running inside native Android WebView
     window.isNativeAndroidApp = function() {
         return Boolean(window.AndroidBridge);
     };
 
 })();
+

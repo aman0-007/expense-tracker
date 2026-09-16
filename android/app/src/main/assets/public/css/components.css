@@ -604,3 +604,222 @@ input:focus, select:focus, textarea:focus {
     flex-shrink: 0;
 }
 
+/* =========================================================
+   TRANSACTION DETAILS SHEET / MODAL
+========================================================= */
+
+.details-modal {
+    padding: 16px 20px 32px 20px;
+    border-radius: 24px 24px 0 0;
+    max-width: 540px;
+}
+
+.details-modal .modal-header {
+    align-items: center;
+    margin-bottom: 16px;
+}
+
+.details-modal .modal-header h2 {
+    font-size: 1.35rem;
+    font-weight: 700;
+    color: var(--text-main);
+    line-height: 1.25;
+    margin-top: 2px;
+}
+
+.details-modal .modal-eyebrow {
+    font-size: 0.78rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+}
+
+.details-hero-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 24px 16px 20px 16px;
+    margin-bottom: 20px;
+    background-color: var(--bg-secondary);
+    border: 1px solid var(--border-soft);
+    border-radius: 18px;
+    text-align: center;
+}
+
+.details-amount {
+    font-size: 2.4rem;
+    font-weight: 800;
+    letter-spacing: -0.025em;
+    line-height: 1.1;
+    margin-bottom: 10px;
+    font-variant-numeric: tabular-nums;
+}
+
+.details-amount.amount-negative {
+    color: var(--expense);
+}
+
+.details-amount.amount-positive {
+    color: var(--income);
+}
+
+.details-type {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    padding: 4px 14px;
+    border-radius: 20px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.details-type.type-expense {
+    background-color: rgba(217, 83, 79, 0.12);
+    color: var(--expense);
+    border: 1px solid rgba(217, 83, 79, 0.2);
+}
+
+.details-type.type-income {
+    background-color: rgba(62, 142, 104, 0.12);
+    color: var(--income);
+    border: 1px solid rgba(62, 142, 104, 0.2);
+}
+
+.details-list {
+    display: flex;
+    flex-direction: column;
+    background-color: var(--bg-secondary);
+    border: 1px solid var(--border-soft);
+    border-radius: 18px;
+    padding: 4px 18px;
+    margin-bottom: 24px;
+}
+
+.detail-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 13px 0;
+    border-bottom: 1px solid var(--border-soft);
+    font-size: 0.9rem;
+}
+
+.detail-row:last-child {
+    border-bottom: none;
+}
+
+.detail-label {
+    color: var(--text-muted);
+    font-size: 0.86rem;
+    font-weight: 500;
+    flex-shrink: 0;
+}
+
+.detail-value {
+    color: var(--text-main);
+    font-weight: 600;
+    text-align: right;
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    max-width: 68%;
+    word-break: break-word;
+}
+
+.detail-value svg,
+.detail-row svg {
+    width: 18px !important;
+    height: 18px !important;
+    max-width: 18px !important;
+    max-height: 18px !important;
+    flex-shrink: 0;
+    display: inline-block;
+    vertical-align: middle;
+}
+
+.details-account-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    background-color: var(--bg-dominant);
+    border: 1px solid var(--border-soft);
+    padding: 4px 10px;
+    border-radius: 10px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-main);
+}
+
+.details-account-chip svg {
+    width: 18px !important;
+    height: 18px !important;
+    flex-shrink: 0;
+}
+
+.details-source-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    padding: 3px 8px;
+    border-radius: 6px;
+    background-color: var(--bg-dominant);
+    border: 1px solid var(--border-soft);
+}
+
+.details-source-badge.source-sms {
+    color: var(--income);
+    border-color: rgba(62, 142, 104, 0.3);
+}
+
+.details-actions {
+    display: flex;
+    gap: 12px;
+    margin-top: 8px;
+}
+
+.details-btn {
+    flex: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    height: 48px;
+    padding: 0 16px;
+    border-radius: 14px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    touch-action: manipulation;
+    transition: opacity 0.15s ease;
+}
+
+.details-btn-edit {
+    background-color: var(--accent);
+    color: #FFFFFF;
+    border: none;
+    box-shadow: 0 2px 8px rgba(44, 54, 63, 0.12);
+}
+
+.details-btn-edit:active {
+    opacity: 0.85;
+}
+
+.details-btn-delete {
+    background-color: transparent;
+    color: var(--expense);
+    border: 1.5px solid var(--expense);
+}
+
+.details-btn-delete:active {
+    background-color: rgba(217, 83, 79, 0.08);
+    opacity: 0.85;
+}
+
+

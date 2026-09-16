@@ -163,7 +163,27 @@ async function initializeSettings() {
 }
 
 
+window.clearDummyTransactions = async function() {
+    try {
+        const existing = await dbGetTransactions();
+        const dummyItems = existing.filter(t => t.source === "dummy" || (t.id && t.id.startsWith("dummy-")));
+        for (const d of dummyItems) {
+            await dbDeleteTransaction(d.id);
+        }
+        await loadTransactions();
+        if (typeof renderApplication === "function") {
+            renderApplication();
+        }
+    } catch (e) {
+        console.error("Failed to clear dummy transactions:", e);
+    }
+};
+
 async function initializeDummyData() {
+    // If running in Native Android app, do not auto-seed fake dummy data!
+    if (window.AndroidBridge) {
+        return;
+    }
 
     const existing =
         await dbGetTransactions();
@@ -489,75 +509,40 @@ async function handleTransactionSubmit(
     }
 
 
+    const isEditing = Boolean(AppState.editingTransactionId);
+    const existingTx = isEditing
+        ? AppState.transactions.find(item => item.id === AppState.editingTransactionId)
+        : null;
+
     const transaction = {
-
-        id:
-            AppState.editingTransactionId ||
-            generateId(),
-
-        type:
-            AppState.transactionType,
-
+        id: AppState.editingTransactionId || generateId(),
+        type: AppState.transactionType,
         amount,
-
-        currency:
-            "INR",
-
+        currency: "INR",
         merchant:
-            document.getElementById(
-                "merchantInput"
-            ).value.trim() ||
-            (AppState.transactionType === "income" ? (document.getElementById("categoryInput").value || "Income Source") : (document.getElementById("categoryInput").value || "Expense")),
-
+            document.getElementById("merchantInput").value.trim() ||
+            (AppState.transactionType === "income"
+                ? (document.getElementById("categoryInput").value || "Income Source")
+                : (document.getElementById("categoryInput").value || "Expense")),
         category:
-            document.getElementById(
-                "categoryInput"
-            ).value ||
+            document.getElementById("categoryInput").value ||
             (AppState.transactionType === "income" ? "Salary" : "Other"),
-
         date:
-            document.getElementById(
-                "dateInput"
-            ).value || getTodayString(),
-
+            document.getElementById("dateInput").value || getTodayString(),
         time:
-            document.getElementById(
-                "timeInput"
-            ).value || getCurrentTime(),
-
+            document.getElementById("timeInput").value || getCurrentTime(),
         account:
-            document.getElementById(
-                "accountInput"
-            ).value.trim() ||
+            document.getElementById("accountInput").value.trim() ||
             (AppState.transactionType === "income" ? "HDFC Bank" : "UPI"),
-
         note:
-            document.getElementById(
-                "noteInput"
-            ).value.trim(),
-
+            document.getElementById("noteInput").value.trim(),
         source:
-            "manual",
-
+            existingTx && existingTx.source ? existingTx.source : "manual",
         smsId:
-            null
-
+            existingTx && existingTx.smsId ? existingTx.smsId : null,
+        createdAt:
+            existingTx && existingTx.createdAt ? existingTx.createdAt : new Date().toISOString()
     };
-
-
-    const isEditing =
-        Boolean(
-            AppState.editingTransactionId
-        );
-
-
-    if (!isEditing) {
-
-        transaction.createdAt =
-            new Date().toISOString();
-
-    }
-
 
     await saveTransaction(
         transaction

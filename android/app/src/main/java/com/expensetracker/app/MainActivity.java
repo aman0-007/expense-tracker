@@ -73,6 +73,12 @@ public class MainActivity extends AppCompatActivity {
         webView.setVerticalScrollBarEnabled(false);
         webView.setHorizontalScrollBarEnabled(false);
 
+        // Ensure full touch and click focus
+        webView.setClickable(true);
+        webView.setFocusable(true);
+        webView.setFocusableInTouchMode(true);
+        webView.requestFocus();
+
         // Setup clients
         webView.setWebChromeClient(new WebChromeClient());
         webView.setWebViewClient(new WebViewClient() {
@@ -134,6 +140,11 @@ public class MainActivity extends AppCompatActivity {
         }
 
         @JavascriptInterface
+        public boolean isNativeApp() {
+            return true;
+        }
+
+        @JavascriptInterface
         public boolean hasSmsPermission() {
             return ContextCompat.checkSelfPermission(context, Manifest.permission.READ_SMS) == PackageManager.PERMISSION_GRANTED;
         }
@@ -147,36 +158,74 @@ public class MainActivity extends AppCompatActivity {
 
         @JavascriptInterface
         public String readInboxSms(int limit) {
+            return readInboxSmsSince(0, limit);
+        }
+
+        @JavascriptInterface
+        public String readInboxSmsSince(long sinceTimestamp, int limit) {
             if (!hasSmsPermission()) {
                 requestSmsPermission();
-                return "[]";
+                return "PERMISSION_REQUESTED";
             }
 
             JSONArray messages = new JSONArray();
-            Uri inboxUri = Uri.parse("content://sms/inbox");
-            String[] projection = new String[]{"_id", "address", "body", "date"};
-            int max = limit > 0 ? limit : 50;
+            int max = limit > 0 ? limit : 200;
 
-            try (Cursor cursor = context.getContentResolver().query(
-                    inboxUri, projection, null, null, "date DESC LIMIT " + max)) {
+            Uri[] candidateUris = new Uri[]{
+                    Uri.parse("content://sms/inbox"),
+                    Uri.parse("content://sms")
+            };
 
-                if (cursor != null && cursor.moveToFirst()) {
-                    int idCol = cursor.getColumnIndex("_id");
-                    int addrCol = cursor.getColumnIndex("address");
-                    int bodyCol = cursor.getColumnIndex("body");
-                    int dateCol = cursor.getColumnIndex("date");
+            for (Uri uri : candidateUris) {
+                if (messages.length() > 0) break;
 
-                    do {
-                        JSONObject msg = new JSONObject();
-                        msg.put("id", cursor.getString(idCol));
-                        msg.put("address", cursor.getString(addrCol));
-                        msg.put("body", cursor.getString(bodyCol));
-                        msg.put("date", cursor.getLong(dateCol));
-                        messages.put(msg);
-                    } while (cursor.moveToNext());
+                try {
+                    String[] projection = new String[]{"_id", "address", "body", "date"};
+                    String selection = sinceTimestamp > 0 ? "date > ?" : null;
+                    String[] selectionArgs = sinceTimestamp > 0 ? new String[]{String.valueOf(sinceTimestamp)} : null;
+
+                    // Standard "date DESC" order without raw LIMIT SQL clause
+                    Cursor cursor = context.getContentResolver().query(
+                            uri,
+                            projection,
+                            selection,
+                            selectionArgs,
+                            "date DESC"
+                    );
+
+                    if (cursor != null) {
+                        try {
+                            int idCol = cursor.getColumnIndex("_id");
+                            int addrCol = cursor.getColumnIndex("address");
+                            int bodyCol = cursor.getColumnIndex("body");
+                            int dateCol = cursor.getColumnIndex("date");
+
+                            int count = 0;
+                            while (cursor.moveToNext() && count < max) {
+                                long msgDate = dateCol >= 0 ? cursor.getLong(dateCol) : System.currentTimeMillis();
+                                if (sinceTimestamp > 0 && msgDate <= sinceTimestamp) {
+                                    // Optimization: Stop reading immediately since results are ordered newest first
+                                    break;
+                                }
+
+                                String body = bodyCol >= 0 ? cursor.getString(bodyCol) : null;
+                                if (body != null && !body.trim().isEmpty()) {
+                                    JSONObject msg = new JSONObject();
+                                    msg.put("id", idCol >= 0 ? cursor.getString(idCol) : String.valueOf(count));
+                                    msg.put("address", addrCol >= 0 ? cursor.getString(addrCol) : "");
+                                    msg.put("body", body);
+                                    msg.put("date", msgDate);
+                                    messages.put(msg);
+                                    count++;
+                                }
+                            }
+                        } finally {
+                            cursor.close();
+                        }
+                    }
+                } catch (Exception e) {
+                    e.printStackTrace();
                 }
-            } catch (Exception e) {
-                e.printStackTrace();
             }
 
             return messages.toString();

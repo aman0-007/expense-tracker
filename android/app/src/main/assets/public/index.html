@@ -989,69 +989,70 @@
             <div class="modal-header">
 
                 <div>
-                    <p>Transaction details</p>
+                    <p class="modal-eyebrow">Transaction details</p>
                     <h2 id="detailsMerchant">Transaction</h2>
                 </div>
 
-                <button class="modal-close" id="closeDetailsModal">
+                <button class="modal-close" id="closeDetailsModal" aria-label="Close modal">
                     ×
                 </button>
 
             </div>
 
+            <div class="details-hero-card">
+                <div class="details-amount" id="detailsAmount">
+                    ₹0
+                </div>
 
-            <div class="details-amount" id="detailsAmount">
-                ₹0
+                <div class="details-type" id="detailsType">
+                    Expense
+                </div>
             </div>
-
-            <div class="details-type" id="detailsType">
-                Expense
-            </div>
-
 
             <div class="details-list">
 
                 <div class="detail-row">
-                    <span>Category</span>
-                    <strong id="detailsCategory">—</strong>
+                    <span class="detail-label">Category</span>
+                    <strong class="detail-value" id="detailsCategory">—</strong>
                 </div>
 
                 <div class="detail-row">
-                    <span>Date</span>
-                    <strong id="detailsDate">—</strong>
+                    <span class="detail-label">Date</span>
+                    <strong class="detail-value" id="detailsDate">—</strong>
                 </div>
 
                 <div class="detail-row">
-                    <span>Time</span>
-                    <strong id="detailsTime">—</strong>
+                    <span class="detail-label">Time</span>
+                    <strong class="detail-value" id="detailsTime">—</strong>
                 </div>
 
                 <div class="detail-row">
-                    <span>Account</span>
-                    <strong id="detailsAccount">—</strong>
+                    <span class="detail-label">Account / Bank</span>
+                    <strong class="detail-value" id="detailsAccount">—</strong>
                 </div>
 
                 <div class="detail-row">
-                    <span>Note</span>
-                    <strong id="detailsNote">—</strong>
+                    <span class="detail-label">Note</span>
+                    <strong class="detail-value" id="detailsNote">—</strong>
                 </div>
 
                 <div class="detail-row">
-                    <span>Source</span>
-                    <strong id="detailsSource">—</strong>
+                    <span class="detail-label">Source</span>
+                    <strong class="detail-value" id="detailsSource">—</strong>
                 </div>
 
             </div>
 
-
             <div class="details-actions">
 
-                <button class="secondary-button" id="editTransactionBtn">
-                    Edit
+                <button class="details-btn details-btn-edit" id="editTransactionBtn">
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                    <span>Edit</span>
                 </button>
 
-                <button class="danger-button" id="deleteTransactionBtn">
-                    Delete
+                <button class="details-btn details-btn-delete" id="deleteTransactionBtn">
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                    <span>Delete</span>
                 </button>
 
             </div>

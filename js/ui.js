@@ -387,7 +387,6 @@ function openDetails(id) {
         transaction.merchant ||
         transaction.category;
 
-
     const amount =
         document.getElementById(
             "detailsAmount"
@@ -404,14 +403,18 @@ function openDetails(id) {
                 : "amount-negative"
         );
 
-
-    document.getElementById(
-        "detailsType"
-    ).textContent =
+    const typeEl = document.getElementById("detailsType");
+    typeEl.textContent =
         transaction.type === "income"
             ? "Income"
             : "Expense";
-
+    typeEl.className =
+        "details-type " +
+        (
+            transaction.type === "income"
+                ? "type-income"
+                : "type-expense"
+        );
 
     document.getElementById(
         "detailsCategory"
@@ -431,7 +434,8 @@ function openDetails(id) {
     const detailsAccountEl = document.getElementById("detailsAccount");
     if (detailsAccountEl) {
         if (transaction.account) {
-            detailsAccountEl.innerHTML = `<span style="display:inline-flex;align-items:center;gap:6px;">${typeof getBankIcon === "function" ? getBankIcon(transaction.account) : ""} <span>${escapeHTML(transaction.account)}</span></span>`;
+            const icon = typeof getBankIcon === "function" ? getBankIcon(transaction.account) : "";
+            detailsAccountEl.innerHTML = `<span class="details-account-chip">${icon}<span>${escapeHTML(transaction.account)}</span></span>`;
         } else {
             detailsAccountEl.textContent = "—";
         }
@@ -442,12 +446,14 @@ function openDetails(id) {
     ).textContent =
         transaction.note || "—";
 
-    document.getElementById(
-        "detailsSource"
-    ).textContent =
-        transaction.source === "sms"
-            ? "SMS"
-            : "Demo data";
+    const detailsSourceEl = document.getElementById("detailsSource");
+    if (detailsSourceEl) {
+        if (transaction.source === "sms") {
+            detailsSourceEl.innerHTML = `<span class="details-source-badge source-sms"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg> SMS Detected</span>`;
+        } else {
+            detailsSourceEl.innerHTML = `<span class="details-source-badge">Manual Entry</span>`;
+        }
+    }
 
 
     openModal(

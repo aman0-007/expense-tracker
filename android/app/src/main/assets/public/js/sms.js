@@ -50,9 +50,11 @@ function initSmsTracking() {
     if (smsToggle) {
         smsToggle.disabled = false;
         
-        // Restore saved preference
-        const savedTracking = localStorage.getItem("expense_sms_tracking") === "true";
-        if (savedTracking) {
+        // Restore saved preference (default to active if native bridge is available)
+        const savedTracking = localStorage.getItem("expense_sms_tracking");
+        const shouldTrack = savedTracking === null ? hasNativeBridge : savedTracking === "true";
+        
+        if (shouldTrack) {
             smsToggle.checked = true;
             startSmsWatching(false);
         }
@@ -68,7 +70,7 @@ function initSmsTracking() {
 
     if (syncBtn) {
         syncBtn.addEventListener("click", () => {
-            syncDeviceSmsInbox();
+            syncDeviceSmsInbox(false, false);
         });
     }
 
@@ -79,6 +81,28 @@ function initSmsTracking() {
             subtitle.textContent = "Active in Android APK (tap to test demo)";
         }
     }
+
+    // Auto-sync on app launch if permission is already granted
+    if (hasNativeBridge && typeof window.AndroidBridge.hasSmsPermission === "function") {
+        setTimeout(() => {
+            try {
+                if (window.AndroidBridge.hasSmsPermission()) {
+                    syncDeviceSmsInbox(false, true /* silent auto-catchup */);
+                }
+            } catch (_) {}
+        }, 1200);
+    }
+
+    // Auto-sync whenever user returns to the app (e.g. after making a payment in GPay/PhonePe)
+    document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "visible" && hasNativeBridge) {
+            try {
+                if (typeof window.AndroidBridge.hasSmsPermission === "function" && window.AndroidBridge.hasSmsPermission()) {
+                    syncDeviceSmsInbox(false, true /* silent auto-catchup */);
+                }
+            } catch (_) {}
+        }
+    });
 }
 
 /**
@@ -177,6 +201,14 @@ async function handleIncomingSmsData(sms) {
     const parsedTx = parseFinancialSms(sms);
     if (!parsedTx) return;
 
+    // Record latest SMS timestamp checkpoint
+    if (sms.date) {
+        const currentCheck = parseInt(localStorage.getItem("expense_last_sms_sync_ts") || "0", 10);
+        if (sms.date > currentCheck) {
+            localStorage.setItem("expense_last_sms_sync_ts", String(sms.date));
+        }
+    }
+
     // Check for duplicate transaction
     const exists = (AppState.transactions || []).some(t => {
         return (t.smsId && t.smsId === parsedTx.smsId) || 
@@ -200,35 +232,96 @@ async function handleIncomingSmsData(sms) {
 }
 
 /**
- * Scan device SMS inbox
+ * Scan device SMS inbox (optimized with incremental sync)
+ * @param {boolean} forceFullSync - Whether to re-scan all inbox messages regardless of timestamp
+ * @param {boolean} isSilent - Whether to suppress toasts when no new messages are detected
  */
-async function syncDeviceSmsInbox() {
-    showToast("Scanning SMS inbox for bank messages...");
+async function syncDeviceSmsInbox(forceFullSync = false, isSilent = false) {
+    const isNative = Boolean(window.AndroidBridge);
+    if (!isSilent) {
+        showToast("Checking bank SMS for new transactions...");
+    }
 
     let smsList = [];
+    let lastSyncTs = 0;
+
+    const hasExistingSmsTransactions = (AppState.transactions || []).some(t => t.source === "sms");
+    if (!forceFullSync && hasExistingSmsTransactions) {
+        lastSyncTs = parseInt(localStorage.getItem("expense_last_sms_sync_ts") || "0", 10);
+    }
 
     // 1. Check if running in Native Android app with AndroidBridge
-    if (window.AndroidBridge && typeof window.AndroidBridge.readInboxSms === "function") {
+    if (isNative && typeof window.AndroidBridge.readInboxSms === "function") {
         try {
-            const rawJson = window.AndroidBridge.readInboxSms(100);
-            if (rawJson) {
+            if (typeof window.AndroidBridge.hasSmsPermission === "function" && !window.AndroidBridge.hasSmsPermission()) {
+                if (!isSilent) {
+                    showToast("SMS permission required. Please allow in the prompt...");
+                }
+                window.AndroidBridge.requestSmsPermission();
+                return;
+            }
+
+            let rawJson;
+            if (typeof window.AndroidBridge.readInboxSmsSince === "function") {
+                rawJson = window.AndroidBridge.readInboxSmsSince(lastSyncTs, 250);
+            } else {
+                rawJson = window.AndroidBridge.readInboxSms(250);
+            }
+
+            if (rawJson === "PERMISSION_REQUESTED") {
+                if (!isSilent) {
+                    showToast("Please allow SMS access in the system dialog...");
+                }
+                return;
+            }
+            if (rawJson && rawJson.trim().startsWith("[")) {
                 smsList = JSON.parse(rawJson);
             }
         } catch (e) {
             console.error("Native SMS read error:", e);
         }
-    }
 
-    // 2. If no messages from native bridge (or running in browser preview), use realistic bank sample batch
-    if (!smsList || smsList.length === 0) {
+        // On Native Android, if no messages found:
+        if (!smsList || smsList.length === 0) {
+            if (!isSilent) {
+                showToast(lastSyncTs > 0 ? "Bank transactions are up-to-date." : "No SMS found in phone inbox.");
+            }
+            return;
+        }
+    } else {
+        // Standalone browser preview demo fallback
         smsList = SAMPLE_DEVICE_BANK_SMS;
     }
 
+    // Update timestamp checkpoint based on latest message received
+    const maxTs = smsList.reduce((max, s) => Math.max(max, Number(s.date) || 0), 0);
+    if (maxTs > 0) {
+        localStorage.setItem("expense_last_sms_sync_ts", String(maxTs));
+    }
+
     let importedCount = 0;
+    const parsedValidList = [];
+
     for (const sms of smsList) {
         const parsedTx = parseFinancialSms(sms);
-        if (!parsedTx) continue;
+        if (parsedTx) {
+            parsedValidList.push(parsedTx);
+        }
+    }
 
+    if (parsedValidList.length === 0) {
+        if (!isSilent) {
+            showToast("No new bank alerts detected in recent SMS.");
+        }
+        return;
+    }
+
+    // Clean up pre-existing fake dummy data if this is a native Android sync
+    if (isNative && window.clearDummyTransactions) {
+        await window.clearDummyTransactions();
+    }
+
+    for (const parsedTx of parsedValidList) {
         const isDuplicate = (AppState.transactions || []).some(t => {
             return (t.smsId && t.smsId === parsedTx.smsId) ||
                    (t.amount === parsedTx.amount && t.date === parsedTx.date && t.merchant === parsedTx.merchant);
@@ -245,36 +338,87 @@ async function syncDeviceSmsInbox() {
     }
 
     if (importedCount > 0) {
-        showToast(`Synced ${importedCount} transactions from SMS inbox`);
-    } else {
-        showToast("All recent bank SMS already up-to-date");
+        showToast(`Synced ${importedCount} new transaction${importedCount > 1 ? "s" : ""} from bank SMS!`);
+        if (window.triggerNativeHaptic) {
+            window.triggerNativeHaptic("medium");
+        }
+    } else if (!isSilent) {
+        showToast("All bank SMS transactions are already up-to-date.");
     }
 }
 
 /**
+ * Android Permission Callback - called from MainActivity.java
+ */
+window.onSmsPermissionResult = function(granted) {
+    if (granted) {
+        showToast("Permission granted! Scanning SMS inbox now...");
+        setTimeout(() => {
+            syncDeviceSmsInbox();
+        }, 300);
+    } else {
+        showToast("SMS permission denied. Enable in Phone Settings to auto-track.");
+    }
+};
+
+/**
+ * Android Real-time SMS Broadcast Callback - called from MainActivity.java
+ */
+window.onNativeSmsReceived = async function(sms) {
+    if (!sms || !sms.body) return;
+    try {
+        const parsedTx = parseFinancialSms(sms);
+        if (!parsedTx) return;
+
+        // If this is the first real transaction and dummy transactions are present, clear dummy
+        if (window.clearDummyTransactions) {
+            const hasDummy = (AppState.transactions || []).some(t => t.source === "dummy" || (t.id && t.id.startsWith("dummy-")));
+            if (hasDummy) {
+                await window.clearDummyTransactions();
+            }
+        }
+
+        const isDuplicate = (AppState.transactions || []).some(t => {
+            return (t.smsId && t.smsId === parsedTx.smsId) ||
+                   (t.amount === parsedTx.amount && t.date === parsedTx.date && t.merchant === parsedTx.merchant);
+        });
+
+        if (!isDuplicate) {
+            await saveTransaction(parsedTx);
+            if (typeof renderApplication === "function") {
+                renderApplication();
+            }
+            showToast(`New ${parsedTx.type}: ₹${parsedTx.amount.toLocaleString("en-IN")} at ${parsedTx.merchant}`);
+            if (window.triggerNativeHaptic) {
+                window.triggerNativeHaptic("medium");
+            }
+        }
+    } catch (e) {
+        console.error("Failed to process real-time SMS:", e);
+    }
+};
+
+/**
  * Robust regex parser for Indian Banking SMS
- * Handles SBI, HDFC, ICICI, BOB, AXIS, KOTAK, UPI
+ * Handles SBI, HDFC, ICICI, BOB, AXIS, KOTAK, PNB, CANARA, UPI, PAYTM, PHONEPE, GPAY
  */
 function parseFinancialSms(sms) {
     if (!sms || !sms.body) return null;
-    const body = sms.body;
-    const lower = body.toLowerCase();
+    const rawBody = sms.body;
+    const lower = rawBody.toLowerCase();
 
-    // Amount match: "Rs. 1,200.00", "INR 450", "₹ 500"
-    const amountRegex = /(?:rs\.?|inr|₹)\s*([0-9,]+(?:\.[0-9]{1,2})?)/i;
-    const amountMatch = body.match(amountRegex);
-    if (!amountMatch) return null;
+    // 1. Filter out OTP, passwords, and non-transaction messages
+    if (lower.includes("otp") || lower.includes("verification code") || lower.includes("do not share") || lower.includes("login password")) {
+        return null;
+    }
 
-    const amount = parseFloat(amountMatch[1].replace(/,/g, ""));
-    if (isNaN(amount) || amount <= 0) return null;
-
-    // Determine type
+    // 2. Identify transaction type keywords
     const expenseKeywords = [
         "debited", "spent", "paid", "deducted", "sent to",
-        "withdrawn", "purchase", "txn", "transferred to", "dr "
+        "withdrawn", "purchase", "txn", "transferred to", "dr ", "dr.", "used at"
     ];
     const incomeKeywords = [
-        "credited", "received", "added", "deposited", "refund", "cashback", "cr "
+        "credited", "received", "added", "deposited", "refund", "cashback", "cr ", "cr."
     ];
 
     const isExpense = expenseKeywords.some(k => lower.includes(k));
@@ -283,10 +427,34 @@ function parseFinancialSms(sms) {
     if (!isExpense && !isIncome) return null;
     const type = isIncome ? "income" : "expense";
 
-    // Detect Bank
+    // 3. Remove available balance / limit clauses to prevent balance misidentification
+    // e.g. "Avl Bal: Rs. 14,000", "Avail Bal Rs 5000", "Balance is Rs 1000", "Limit: Rs 50,000"
+    const balancePattern = /(?:avl(?:\.|\s+)?bal(?:ance)?|avail(?:able)?\s+bal(?:ance)?|net\s+bal(?:ance)?|total\s+bal(?:ance)?|balance\s*is|bal:?|avl\s+lmt|avail\s+limit|bal\s+inr|bal\s+rs)\s*(?:is|:)?\s*(?:rs\.?|inr|₹)?\s*[0-9,]+(?:\.[0-9]{1,2})?/gi;
+    const cleanedBody = rawBody.replace(balancePattern, " [BAL_STRIPPED] ");
+
+    // 4. Extract Amount
+    let amount = 0;
+    // Match amount right next to financial verbs first (highest precision)
+    let amountMatch = cleanedBody.match(/(?:debited|credited|spent|paid|withdrawn|sent|received|purchase|transferred|refund|cashback|deposited)\s+(?:for|by|of|with|amount of)?\s*(?:rs\.?|inr|₹)?\s*([0-9,]+(?:\.[0-9]{1,2})?)/i);
+
+    if (!amountMatch) {
+        amountMatch = cleanedBody.match(/(?:rs\.?|inr|₹)\s*([0-9,]+(?:\.[0-9]{1,2})?)\s*(?:has been|is|was)?\s*(?:debited|credited|spent|paid|withdrawn|sent|received|transferred|deposited)?/i);
+    }
+
+    if (!amountMatch) {
+        amountMatch = cleanedBody.match(/(?:rs\.?|inr|₹)\s*([0-9,]+(?:\.[0-9]{1,2})?)/i);
+    }
+
+    if (amountMatch && amountMatch[1]) {
+        amount = parseFloat(amountMatch[1].replace(/,/g, ""));
+    }
+
+    if (isNaN(amount) || amount <= 0) return null;
+
+    // 5. Detect Bank Name
     let bankAccount = "Bank Account";
     const sender = (sms.address || "").toUpperCase();
-    const fullText = (sender + " " + body).toUpperCase();
+    const fullText = (sender + " " + rawBody).toUpperCase();
 
     if (fullText.includes("HDFC")) {
         bankAccount = "HDFC Bank";
@@ -300,11 +468,17 @@ function parseFinancialSms(sms) {
         bankAccount = "Axis Bank";
     } else if (fullText.includes("KOTAK")) {
         bankAccount = "Kotak Bank";
+    } else if (fullText.includes("PNB") || fullText.includes("PUNJAB NATIONAL")) {
+        bankAccount = "PNB Bank";
+    } else if (fullText.includes("CANARA")) {
+        bankAccount = "Canara Bank";
+    } else if (fullText.includes("PAYTM")) {
+        bankAccount = "Paytm Bank";
     } else if (fullText.includes("UPI")) {
         bankAccount = "UPI";
     }
 
-    // Extract Merchant or Source
+    // 6. Extract Merchant or Source
     let merchant = "";
     if (type === "income") {
         if (lower.includes("salary")) merchant = "Monthly Salary";
@@ -313,8 +487,8 @@ function parseFinancialSms(sms) {
         else if (lower.includes("refund")) merchant = "Refund Received";
         else merchant = bankAccount + " Credit";
     } else {
-        // Look for merchant keywords: "to ...", "at ...", "vpa ..."
-        const merchantMatch = body.match(/(?:to|at|vpa|info:)\s+([A-Za-z0-9\.\@\s\-_]{3,24})(?:[\.\,\;\s]+(?:on|ref|val|avbl|avl|bal|upi|thru)|$)/i);
+        // Match merchant names after "to", "at", "vpa", "info:", "towards"
+        const merchantMatch = rawBody.match(/(?:to|at|vpa|info:|towards)\s+([A-Za-z0-9\.\@\s\-_]{2,30})(?:[\.\,\;\s]+(?:on|ref|val|avbl|avl|bal|upi|thru)|$)/i);
         if (merchantMatch && merchantMatch[1]) {
             merchant = merchantMatch[1].trim().replace(/^UPI-?/i, "").trim();
         }
@@ -323,36 +497,36 @@ function parseFinancialSms(sms) {
         }
     }
 
-    // Intelligent Category Assignment
+    // 7. Intelligent Category Assignment
     let category = type === "income" ? "Salary" : "Other";
     const checkText = (merchant + " " + lower).toLowerCase();
 
     if (type === "income") {
         if (checkText.includes("salary") || checkText.includes("payroll")) category = "Salary";
         else if (checkText.includes("freelance") || checkText.includes("consult")) category = "Freelance";
-        else if (checkText.includes("dividend") || checkText.includes("mutual") || checkText.includes("stock")) category = "Investments";
+        else if (checkText.includes("dividend") || checkText.includes("mutual") || checkText.includes("stock") || checkText.includes("groww") || checkText.includes("zerodha")) category = "Investments";
         else if (checkText.includes("cashback") || checkText.includes("reward") || checkText.includes("refund")) category = "Refund & Cashback";
         else if (checkText.includes("rent")) category = "Rental";
         else category = "Income";
     } else {
-        if (checkText.includes("swiggy") || checkText.includes("zomato") || checkText.includes("restaurant") || checkText.includes("mcdonald") || checkText.includes("burger") || checkText.includes("cafe")) {
+        if (checkText.includes("swiggy") || checkText.includes("zomato") || checkText.includes("restaurant") || checkText.includes("mcdonald") || checkText.includes("burger") || checkText.includes("cafe") || checkText.includes("starbucks") || checkText.includes("domino") || checkText.includes("chai")) {
             category = "Food";
-        } else if (checkText.includes("blinkit") || checkText.includes("zepto") || checkText.includes("grocery") || checkText.includes("mart") || checkText.includes("bigbasket") || checkText.includes("supermarket")) {
+        } else if (checkText.includes("blinkit") || checkText.includes("zepto") || checkText.includes("grocery") || checkText.includes("mart") || checkText.includes("bigbasket") || checkText.includes("supermarket") || checkText.includes("dmart") || checkText.includes("reliance fresh")) {
             category = "Groceries";
-        } else if (checkText.includes("uber") || checkText.includes("ola") || checkText.includes("rapido") || checkText.includes("metro") || checkText.includes("petrol") || checkText.includes("fuel") || checkText.includes("shell") || checkText.includes("indian oil")) {
+        } else if (checkText.includes("uber") || checkText.includes("ola") || checkText.includes("rapido") || checkText.includes("metro") || checkText.includes("petrol") || checkText.includes("fuel") || checkText.includes("shell") || checkText.includes("indian oil") || checkText.includes("hpcl") || checkText.includes("bpcl")) {
             category = "Transport";
-        } else if (checkText.includes("amazon") || checkText.includes("flipkart") || checkText.includes("myntra") || checkText.includes("zara") || checkText.includes("meesho")) {
+        } else if (checkText.includes("amazon") || checkText.includes("flipkart") || checkText.includes("myntra") || checkText.includes("zara") || checkText.includes("meesho") || checkText.includes("ajio")) {
             category = "Shopping";
-        } else if (checkText.includes("bescom") || checkText.includes("electricity") || checkText.includes("airtel") || checkText.includes("jio") || checkText.includes("bill") || checkText.includes("recharge")) {
+        } else if (checkText.includes("bescom") || checkText.includes("electricity") || checkText.includes("airtel") || checkText.includes("jio") || checkText.includes("bill") || checkText.includes("recharge") || checkText.includes("vi") || checkText.includes("gas") || checkText.includes("water")) {
             category = "Bills";
-        } else if (checkText.includes("apollo") || checkText.includes("pharmeasy") || checkText.includes("hospital") || checkText.includes("clinic") || checkText.includes("1mg") || checkText.includes("med")) {
+        } else if (checkText.includes("apollo") || checkText.includes("pharmeasy") || checkText.includes("hospital") || checkText.includes("clinic") || checkText.includes("1mg") || checkText.includes("med") || checkText.includes("doctor")) {
             category = "Health";
-        } else if (checkText.includes("netflix") || checkText.includes("prime") || checkText.includes("bookmyshow") || checkText.includes("pvr") || checkText.includes("inox") || checkText.includes("spotify")) {
+        } else if (checkText.includes("netflix") || checkText.includes("prime") || checkText.includes("bookmyshow") || checkText.includes("pvr") || checkText.includes("inox") || checkText.includes("spotify") || checkText.includes("hotstar") || checkText.includes("cinema")) {
             category = "Entertainment";
         }
     }
 
-    // Timestamp formatting
+    // 8. Timestamp formatting
     let txDate = getTodayString();
     let txTime = getCurrentTime();
     if (sms.date) {
@@ -373,9 +547,9 @@ function parseFinancialSms(sms) {
         date: txDate,
         time: txTime,
         account: bankAccount,
-        note: `Auto-synced from ${sender || "SMS"}`,
+        note: `Synced from ${bankAccount} SMS`,
         source: "sms",
-        smsId: String(sms.id || sms.date || (sender + "_" + amount + "_" + txDate)),
+        smsId: String(sms.id || (sender + "_" + amount + "_" + txDate)),
         createdAt: new Date().toISOString()
     };
 }

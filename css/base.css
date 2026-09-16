@@ -64,14 +64,9 @@ html, body {
     width: 100%;
     scrollbar-width: none !important;
     -ms-overflow-style: none !important;
-    /* Native Android & iOS Touch Controls */
-    touch-action: pan-y;
-    overscroll-behavior: none;
-    overscroll-behavior-y: none;
-    overscroll-behavior-x: none;
-    -webkit-touch-callout: none;
-    -webkit-user-select: none;
-    user-select: none;
+    /* Native Android & iOS Touch Controls: manipulation enables immediate taps without zoom delays or touch locks */
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
 }
 
 body {
@@ -84,20 +79,26 @@ body {
     padding-top: env(safe-area-inset-top, 0px);
 }
 
-/* Allow text selection only where useful */
+/* Prevent accidental text highlight on UI chrome only */
+button, .nav-item, .modal-handle, .floating-add, .type-button, .cat-pill, .account-chip {
+    -webkit-user-select: none;
+    user-select: none;
+}
+
+/* Allow text selection where appropriate */
 input, textarea, [contenteditable="true"], .selectable-text {
     -webkit-user-select: text;
     user-select: text;
 }
 
 /* Native feel for interactive touch elements */
-button, a, .cat-pill, .account-chip, .quick-amt-chip, .nav-item, .type-button, .sugg-chip, .settings-item {
+button, a, .cat-pill, .account-chip, .quick-amt-chip, .nav-item, .type-button, .sugg-chip, .settings-item, .balance-card, .transaction-item, .modal-close, .floating-add {
     touch-action: manipulation;
     cursor: pointer;
     -webkit-tap-highlight-color: transparent;
 }
 
-/* Native Android Active Press States */
+/* Native Android Active Press States (using opacity so element bounding boxes never shift during touch) */
 button:active:not(:disabled),
 .balance-card:active,
 .transaction-item:active,
@@ -105,9 +106,9 @@ button:active:not(:disabled),
 .cat-pill:active,
 .account-chip:active,
 .quick-amt-chip:active,
-.sugg-chip:active {
-    transform: scale(0.975);
-    transition: transform 0.08s ease;
+.sugg-chip:active,
+.floating-add:active {
+    opacity: 0.82;
 }
 
 #app {
