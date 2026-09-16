@@ -24,6 +24,8 @@ async function initApplication() {
 
         await loadTransactions();
 
+        await cleanupNonExecutedSmsTransactions();
+
         AppState.transactions =
             sortTransactions(
                 AppState.transactions
@@ -99,6 +101,9 @@ async function initializeCategories() {
                 if (!cat.type && match.type) {
                     cat.type = match.type;
                 }
+                if ((cat.name || "").toLowerCase() === "investments") {
+                    cat.type = "both";
+                }
                 await dbSaveCategory(cat);
             }
         }
@@ -117,6 +122,30 @@ async function initializeCategories() {
     AppState.categories =
         categories;
 
+}
+
+/**
+ * Automatically purges any past upcoming payment or reminder SMS alerts
+ * that were mistakenly saved into the transactions database.
+ */
+async function cleanupNonExecutedSmsTransactions() {
+    if (!AppState.transactions || !AppState.transactions.length) return;
+    const invalidPattern = /(?:upcoming|will\s+be\s+debited|will\s+be\s+deducted|sufficient\s+balance|scheduled\s+to|mandate\s+created|reminder)/i;
+    const toRemove = AppState.transactions.filter(t => {
+        const text = `${t.merchant || ""} ${t.note || ""} ${t.smsId || ""}`;
+        return invalidPattern.test(text);
+    });
+
+    if (toRemove.length > 0) {
+        for (const tx of toRemove) {
+            AppState.transactions = AppState.transactions.filter(t => t.id !== tx.id);
+            try {
+                if (typeof dbDeleteTransaction === "function") {
+                    await dbDeleteTransaction(tx.id);
+                }
+            } catch (_) {}
+        }
+    }
 }
 
 
@@ -159,6 +188,9 @@ async function initializeSettings() {
     const theme = AppState.settings.appearance === "dark" ? "dark" : "light";
     document.documentElement.setAttribute("data-theme", theme);
     document.body.setAttribute("data-theme", theme);
+    if (typeof updateStatusBarTheme === "function") {
+        updateStatusBarTheme(theme);
+    }
 
 }
 
@@ -857,6 +889,9 @@ async function toggleAppearance() {
 
     document.documentElement.setAttribute("data-theme", nextTheme);
     document.body.setAttribute("data-theme", nextTheme);
+    if (typeof updateStatusBarTheme === "function") {
+        updateStatusBarTheme(nextTheme);
+    }
 
     updateSettingsUI();
     renderAnalytics();

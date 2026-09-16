@@ -132,6 +132,17 @@
 
 .transaction-list, .category-list, .transaction-history { padding: 0 20px; }
 
+@keyframes txFadeSlide {
+    from {
+        opacity: 0;
+        transform: translateY(6px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
 .transaction-item {
     background-color: var(--surface);
     padding: 14px 16px;
@@ -142,8 +153,9 @@
     gap: 14px;
     border: 1px solid var(--border-soft);
     box-shadow: 0 2px 6px rgba(44, 54, 63, 0.04);
-    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s ease, background-color 0.2s ease;
     cursor: pointer;
+    animation: txFadeSlide 0.22s cubic-bezier(0.16, 1, 0.3, 1) backwards;
 }
 
 .category-row {
@@ -156,16 +168,18 @@
     gap: 14px;
     border: 1px solid var(--border-soft);
     box-shadow: 0 2px 6px rgba(44, 54, 63, 0.04);
-    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s ease, background-color 0.2s ease;
+    animation: txFadeSlide 0.22s cubic-bezier(0.16, 1, 0.3, 1) backwards;
 }
 
 .transaction-item:hover {
-    border-color: rgba(224, 122, 95, 0.3);
-    box-shadow: 0 4px 12px rgba(44, 54, 63, 0.08);
+    border-color: rgba(224, 122, 95, 0.35);
+    box-shadow: 0 6px 16px rgba(44, 54, 63, 0.08);
+    transform: translateY(-1px);
 }
 
 .transaction-item:active {
-    transform: scale(0.985);
+    transform: scale(0.98);
     background-color: var(--bg-secondary);
 }
 

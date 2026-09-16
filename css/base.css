@@ -42,13 +42,25 @@
     --shadow-soft: 0 8px 24px rgba(0, 0, 0, 0.35);
 }
 
-* {
+*, *::before, *::after {
     margin: 0;
     padding: 0;
     box-sizing: border-box;
     -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
     scrollbar-width: none !important;
     -ms-overflow-style: none !important;
+}
+
+input, textarea, [contenteditable="true"] {
+    -webkit-user-select: text !important;
+    -moz-user-select: text !important;
+    -ms-user-select: text !important;
+    user-select: text !important;
 }
 
 *::-webkit-scrollbar {

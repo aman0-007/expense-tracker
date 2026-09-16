@@ -303,10 +303,21 @@ async function syncDeviceSmsInbox(forceFullSync = false, isSilent = false) {
     let importedCount = 0;
     const parsedValidList = [];
 
-    for (const sms of smsList) {
-        const parsedTx = parseFinancialSms(sms);
-        if (parsedTx) {
-            parsedValidList.push(parsedTx);
+    // Yield to browser event loop to guarantee 60fps UI responsiveness
+    const yieldToEventLoop = () => new Promise(resolve => setTimeout(resolve, 0));
+
+    // Time-sliced batch parsing (25 messages per chunk)
+    const BATCH_SIZE = 25;
+    for (let i = 0; i < smsList.length; i += BATCH_SIZE) {
+        const batch = smsList.slice(i, i + BATCH_SIZE);
+        for (const sms of batch) {
+            const parsedTx = parseFinancialSms(sms);
+            if (parsedTx) {
+                parsedValidList.push(parsedTx);
+            }
+        }
+        if (smsList.length > BATCH_SIZE) {
+            await yieldToEventLoop();
         }
     }
 
@@ -322,20 +333,32 @@ async function syncDeviceSmsInbox(forceFullSync = false, isSilent = false) {
         await window.clearDummyTransactions();
     }
 
-    for (const parsedTx of parsedValidList) {
-        const isDuplicate = (AppState.transactions || []).some(t => {
-            return (t.smsId && t.smsId === parsedTx.smsId) ||
-                   (t.amount === parsedTx.amount && t.date === parsedTx.date && t.merchant === parsedTx.merchant);
-        });
+    // Fast O(1) deduplication check using Set indices
+    const existingIds = new Set((AppState.transactions || []).map(t => t.smsId).filter(Boolean));
+    const existingSignatures = new Set((AppState.transactions || []).map(t => `${t.amount}_${t.date}_${t.merchant}`));
+    const newTransactionsToSave = [];
 
-        if (!isDuplicate) {
-            await saveTransaction(parsedTx);
-            importedCount++;
+    for (const parsedTx of parsedValidList) {
+        const hasIdMatch = parsedTx.smsId && existingIds.has(parsedTx.smsId);
+        const hasSigMatch = existingSignatures.has(`${parsedTx.amount}_${parsedTx.date}_${parsedTx.merchant}`);
+
+        if (!hasIdMatch && !hasSigMatch) {
+            newTransactionsToSave.push(parsedTx);
+            if (parsedTx.smsId) existingIds.add(parsedTx.smsId);
+            existingSignatures.add(`${parsedTx.amount}_${parsedTx.date}_${parsedTx.merchant}`);
         }
     }
 
-    if (typeof renderApplication === "function") {
-        renderApplication();
+    // Batch persist all new transactions in a single transaction & single render
+    if (newTransactionsToSave.length > 0) {
+        if (typeof saveTransactionsBatch === "function") {
+            await saveTransactionsBatch(newTransactionsToSave);
+        } else {
+            for (const item of newTransactionsToSave) {
+                await saveTransaction(item);
+            }
+        }
+        importedCount = newTransactionsToSave.length;
     }
 
     if (importedCount > 0) {
@@ -400,20 +423,81 @@ window.onNativeSmsReceived = async function(sms) {
 };
 
 /**
- * Robust regex parser for Indian Banking SMS
- * Handles SBI, HDFC, ICICI, BOB, AXIS, KOTAK, PNB, CANARA, UPI, PAYTM, PHONEPE, GPAY
+ * Robust regex parser for Indian Banking & Financial SMS
+ * Handles SBI, HDFC, ICICI, BOB, AXIS, KOTAK, PNB, CANARA, UPI, PAYTM, PHONEPE, GPAY,
+ * and Investment platforms (Angel One, Zerodha, Groww, Upstox, Mutual Funds, etc.)
  */
 function parseFinancialSms(sms) {
     if (!sms || !sms.body) return null;
     const rawBody = sms.body;
     const lower = rawBody.toLowerCase();
+    const sender = (sms.address || "").toUpperCase();
+    const fullText = (sender + " " + rawBody).toUpperCase();
 
-    // 1. Filter out OTP, passwords, and non-transaction messages
-    if (lower.includes("otp") || lower.includes("verification code") || lower.includes("do not share") || lower.includes("login password")) {
+    // 1. Filter out OTP, passwords, verification codes, and security warnings
+    if (
+        /\b(?:otp|one\s*time\s*password|verification\s*code|secret\s*code|m-?pin|upi\s*pin|login\s*password)\b/i.test(rawBody) ||
+        /do\s+not\s+share/i.test(rawBody) ||
+        /security\s+alert/i.test(rawBody)
+    ) {
         return null;
     }
 
-    // 2. Identify transaction type keywords
+    // 2. Strict Filter: Filter out Upcoming / Reminder / Scheduled / Pre-debit alerts & Mandates
+    // (e.g. "Upcoming Payment!", "Rs 1,000 will be debited on 18 Sep 2026 for upcoming SIP... Ensure you have sufficient balance")
+    const nonExecutedPatterns = [
+        /\bwill\s+be\s+(?:debited|deducted|charged|transferred|processed)\b/i,
+        /\bwould\s+be\s+(?:debited|deducted)\b/i,
+        /\bshall\s+be\s+(?:debited|deducted)\b/i,
+        /\bupcoming\s+(?:payment|sip|bill|installment|emi|debit|mandate|txn|transaction)\b/i,
+        /\bfor\s+upcoming\b/i,
+        /\b(?:is|are)\s+scheduled\s+to\b/i,
+        /\bscheduled\s+(?:on|for|to\s+be|debit)\b/i,
+        /\bauto\s*debit\s+scheduled\b/i,
+        /\bstanding\s+instruction\s+scheduled\b/i,
+        /\bensure\s+(?:you\s+have\s+)?sufficient\s+balance\b/i,
+        /\b(?:maintain|keep|have)\s+sufficient\s+(?:balance|funds)\b/i,
+        /\bkindly\s+maintain\s+balance\b/i,
+        /\bsufficient\s+balance\s+in\s+your\b/i,
+        /\bpayment\s+reminder\b/i,
+        /\bbill\s+reminder\b/i,
+        /\breminder\s*:/i,
+        /\bfriendly\s+reminder\b/i,
+        /\b(?:payment|bill|amount|installment)\s+(?:is\s+)?due\s+on\b/i,
+        /\bdue\s+date\s*(?:is|:)\b/i,
+        /\blast\s+date\s+to\s+pay\b/i,
+        /\bpay\s+before\b/i,
+        /\bmandate\s+(?:has\s+been\s+)?(?:created|registered|approved)\b/i,
+        /\be-mandate\b/i,
+        /\bautopay\s+request\b/i,
+        
+        // Failed / Declined / Unsuccessful transactions
+        /\b(?:transaction|payment|txn|auto\s*debit)\s+(?:failed|declined|unsuccessful|rejected)\b/i,
+        /\bfailed\s+to\s+debit\b/i,
+        /\bcould\s+not\s+be\s+processed\b/i,
+        /\binsufficient\s+balance\s+to\s+debit\b/i,
+        /\binward\s+mandate\s+rejected\b/i,
+        
+        // Payment requests / Collect money calls
+        /\brequested\s+money\b/i,
+        /\bpayment\s+request\s+from\b/i,
+        /\bcollect\s+request\b/i,
+        /\bhas\s+requested\s+(?:rs\.?|inr|₹)?\b/i,
+
+        // Promotional / Pre-approved loan offers
+        /\bpre-?approved\b/i,
+        /\bapply\s+now\b/i,
+        /\binstant\s+(?:personal\s+)?loan\b/i,
+        /\bcredit\s+limit\s+increase\b/i
+    ];
+
+    for (const pattern of nonExecutedPatterns) {
+        if (pattern.test(rawBody)) {
+            return null; // Skip non-executed alerts
+        }
+    }
+
+    // 3. Identify executed transaction type keywords
     const expenseKeywords = [
         "debited", "spent", "paid", "deducted", "sent to",
         "withdrawn", "purchase", "txn", "transferred to", "dr ", "dr.", "used at"
@@ -428,14 +512,12 @@ function parseFinancialSms(sms) {
     if (!isExpense && !isIncome) return null;
     const type = isIncome ? "income" : "expense";
 
-    // 3. Remove available balance / limit clauses to prevent balance misidentification
-    // e.g. "Avl Bal: Rs. 14,000", "Avail Bal Rs 5000", "Balance is Rs 1000", "Limit: Rs 50,000"
+    // 4. Remove available balance / limit clauses to prevent balance misidentification
     const balancePattern = /(?:avl(?:\.|\s+)?bal(?:ance)?|avail(?:able)?\s+bal(?:ance)?|net\s+bal(?:ance)?|total\s+bal(?:ance)?|balance\s*is|bal:?|avl\s+lmt|avail\s+limit|bal\s+inr|bal\s+rs)\s*(?:is|:)?\s*(?:rs\.?|inr|₹)?\s*[0-9,]+(?:\.[0-9]{1,2})?/gi;
     const cleanedBody = rawBody.replace(balancePattern, " [BAL_STRIPPED] ");
 
-    // 4. Extract Amount
+    // 5. Extract Amount
     let amount = 0;
-    // Match amount right next to financial verbs first (highest precision)
     let amountMatch = cleanedBody.match(/(?:debited|credited|spent|paid|withdrawn|sent|received|purchase|transferred|refund|cashback|deposited)\s+(?:for|by|of|with|amount of)?\s*(?:rs\.?|inr|₹)?\s*([0-9,]+(?:\.[0-9]{1,2})?)/i);
 
     if (!amountMatch) {
@@ -452,11 +534,8 @@ function parseFinancialSms(sms) {
 
     if (isNaN(amount) || amount <= 0) return null;
 
-    // 5. Detect Bank Name
+    // 6. Detect Bank Name
     let bankAccount = "Bank Account";
-    const sender = (sms.address || "").toUpperCase();
-    const fullText = (sender + " " + rawBody).toUpperCase();
-
     if (fullText.includes("HDFC")) {
         bankAccount = "HDFC Bank";
     } else if (fullText.includes("SBI") || fullText.includes("STATE BANK")) {
@@ -475,42 +554,102 @@ function parseFinancialSms(sms) {
         bankAccount = "Canara Bank";
     } else if (fullText.includes("PAYTM")) {
         bankAccount = "Paytm Bank";
+    } else if (fullText.includes("FEDERAL")) {
+        bankAccount = "Federal Bank";
+    } else if (fullText.includes("INDUSIND")) {
+        bankAccount = "IndusInd Bank";
+    } else if (fullText.includes("IDFC")) {
+        bankAccount = "IDFC FIRST Bank";
     } else if (fullText.includes("UPI")) {
         bankAccount = "UPI";
     }
 
-    // 6. Extract Merchant or Source
+    // 7. Check for Investment platforms & keywords
+    const isInvestment = (
+        lower.includes("sip") ||
+        lower.includes("mutual fund") ||
+        lower.includes("index fund") ||
+        lower.includes("etf") ||
+        lower.includes("stocks") ||
+        lower.includes("equity") ||
+        lower.includes("demat") ||
+        lower.includes("angel one") ||
+        sender.includes("ANGONE") ||
+        sender.includes("ANGEL") ||
+        lower.includes("zerodha") ||
+        sender.includes("ZERODH") ||
+        lower.includes("groww") ||
+        lower.includes("upstox") ||
+        lower.includes("smallcase") ||
+        lower.includes("kuvera") ||
+        lower.includes("paytm money") ||
+        lower.includes("5paisa") ||
+        lower.includes("sharekhan") ||
+        lower.includes("motilal") ||
+        lower.includes("nippon") ||
+        lower.includes("mirae") ||
+        lower.includes("parag parikh") ||
+        lower.includes("ppfas") ||
+        lower.includes("aditya birla sun life") ||
+        lower.includes("navi nifty") ||
+        lower.includes("nps") ||
+        lower.includes("ppf") ||
+        lower.includes("dividend")
+    );
+
+    // 8. Extract Merchant or Source
     let merchant = "";
     if (type === "income") {
         if (lower.includes("salary")) merchant = "Monthly Salary";
-        else if (lower.includes("cashback")) merchant = "Cashback Reward";
         else if (lower.includes("dividend")) merchant = "Stock Dividend";
+        else if (lower.includes("cashback")) merchant = "Cashback Reward";
         else if (lower.includes("refund")) merchant = "Refund Received";
+        else if (isInvestment) merchant = "Investment Return";
         else merchant = bankAccount + " Credit";
     } else {
-        // Match merchant names after "to", "at", "vpa", "info:", "towards"
-        const merchantMatch = rawBody.match(/(?:to|at|vpa|info:|towards)\s+([A-Za-z0-9\.\@\s\-_]{2,30})(?:[\.\,\;\s]+(?:on|ref|val|avbl|avl|bal|upi|thru)|$)/i);
-        if (merchantMatch && merchantMatch[1]) {
-            merchant = merchantMatch[1].trim().replace(/^UPI-?/i, "").trim();
-        }
-        if (!merchant || merchant.length < 2) {
-            merchant = bankAccount + " Expense";
+        if (sender.includes("ANGONE") || lower.includes("angel one")) {
+            merchant = "Angel One";
+        } else if (sender.includes("ZERODH") || lower.includes("zerodha")) {
+            merchant = "Zerodha";
+        } else if (lower.includes("groww")) {
+            merchant = "Groww";
+        } else if (lower.includes("upstox")) {
+            merchant = "Upstox";
+        } else if (lower.includes("navi nifty") || lower.includes("navi mutual")) {
+            merchant = "Navi Mutual Fund";
+        } else {
+            const merchantMatch = rawBody.match(/(?:to|at|vpa|info:|towards)\s+([A-Za-z0-9\.\@\s\-_]{2,30})(?:[\.\,\;\s]+(?:on|ref|val|avbl|avl|bal|upi|thru)|$)/i);
+            if (merchantMatch && merchantMatch[1]) {
+                merchant = merchantMatch[1].trim().replace(/^UPI-?/i, "").trim();
+            }
+            if (!merchant || merchant.length < 2) {
+                merchant = isInvestment ? "Investment SIP" : bankAccount + " Expense";
+            }
         }
     }
 
-    // 7. Intelligent Category Assignment
+    // 9. Intelligent Category Assignment (including Investments)
     let category = type === "income" ? "Salary" : "Other";
-    const checkText = (merchant + " " + lower).toLowerCase();
+    const checkText = (merchant + " " + lower + " " + sender).toLowerCase();
 
     if (type === "income") {
-        if (checkText.includes("salary") || checkText.includes("payroll")) category = "Salary";
-        else if (checkText.includes("freelance") || checkText.includes("consult")) category = "Freelance";
-        else if (checkText.includes("dividend") || checkText.includes("mutual") || checkText.includes("stock") || checkText.includes("groww") || checkText.includes("zerodha")) category = "Investments";
-        else if (checkText.includes("cashback") || checkText.includes("reward") || checkText.includes("refund")) category = "Refund & Cashback";
-        else if (checkText.includes("rent")) category = "Rental";
-        else category = "Income";
+        if (isInvestment || checkText.includes("dividend") || checkText.includes("mutual") || checkText.includes("stock") || checkText.includes("groww") || checkText.includes("zerodha") || checkText.includes("angel")) {
+            category = "Investments";
+        } else if (checkText.includes("salary") || checkText.includes("payroll")) {
+            category = "Salary";
+        } else if (checkText.includes("freelance") || checkText.includes("consult")) {
+            category = "Freelance";
+        } else if (checkText.includes("cashback") || checkText.includes("reward") || checkText.includes("refund")) {
+            category = "Refund & Cashback";
+        } else if (checkText.includes("rent")) {
+            category = "Rental";
+        } else {
+            category = "Income";
+        }
     } else {
-        if (checkText.includes("swiggy") || checkText.includes("zomato") || checkText.includes("restaurant") || checkText.includes("mcdonald") || checkText.includes("burger") || checkText.includes("cafe") || checkText.includes("starbucks") || checkText.includes("domino") || checkText.includes("chai")) {
+        if (isInvestment) {
+            category = "Investments";
+        } else if (checkText.includes("swiggy") || checkText.includes("zomato") || checkText.includes("restaurant") || checkText.includes("mcdonald") || checkText.includes("burger") || checkText.includes("cafe") || checkText.includes("starbucks") || checkText.includes("domino") || checkText.includes("chai")) {
             category = "Food";
         } else if (checkText.includes("blinkit") || checkText.includes("zepto") || checkText.includes("grocery") || checkText.includes("mart") || checkText.includes("bigbasket") || checkText.includes("supermarket") || checkText.includes("dmart") || checkText.includes("reliance fresh")) {
             category = "Groceries";
@@ -527,7 +666,7 @@ function parseFinancialSms(sms) {
         }
     }
 
-    // 8. Timestamp formatting
+    // 10. Timestamp formatting
     let txDate = getTodayString();
     let txTime = getCurrentTime();
     if (sms.date) {
@@ -556,5 +695,9 @@ function parseFinancialSms(sms) {
 }
 
 document.addEventListener("DOMContentLoaded", () => {
-    setTimeout(initSmsTracking, 800);
+    // Non-blocking deferred init: Allows UI, charts, and first frame to render smoothly
+    const scheduleInit = window.requestIdleCallback || ((cb) => setTimeout(cb, 1500));
+    scheduleInit(() => {
+        initSmsTracking();
+    });
 });

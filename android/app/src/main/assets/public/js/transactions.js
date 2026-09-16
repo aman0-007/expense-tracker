@@ -44,6 +44,39 @@ async function saveTransaction(data) {
 }
 
 
+async function saveTransactionsBatch(dataList) {
+    if (!dataList || dataList.length === 0) return;
+
+    const formattedList = dataList.map(data => ({
+        ...data,
+        amount: Number(data.amount),
+        updatedAt: new Date().toISOString()
+    }));
+
+    if (typeof dbSaveTransactionsBatch === "function") {
+        await dbSaveTransactionsBatch(formattedList);
+    } else {
+        for (const item of formattedList) {
+            await dbSaveTransaction(item);
+        }
+    }
+
+    for (const transaction of formattedList) {
+        const index = AppState.transactions.findIndex(
+            item => item.id === transaction.id
+        );
+        if (index >= 0) {
+            AppState.transactions[index] = transaction;
+        } else {
+            AppState.transactions.push(transaction);
+        }
+    }
+
+    AppState.transactions = sortTransactions(AppState.transactions);
+    renderApplication();
+}
+
+
 async function deleteTransaction(id) {
 
     await dbDeleteTransaction(id);

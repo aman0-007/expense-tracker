@@ -146,6 +146,38 @@ async function dbSaveTransaction(transactionData) {
 }
 
 
+async function dbSaveTransactionsBatch(transactionsList) {
+    if (!transactionsList || transactionsList.length === 0) return [];
+
+    const db = await openDatabase();
+
+    return new Promise((resolve, reject) => {
+        const transaction = db.transaction(
+            "transactions",
+            "readwrite"
+        );
+
+        const store = transaction.objectStore("transactions");
+
+        for (const item of transactionsList) {
+            store.put(item);
+        }
+
+        transaction.oncomplete = () => {
+            resolve(transactionsList);
+        };
+
+        transaction.onerror = () => {
+            reject(transaction.error);
+        };
+
+        transaction.onabort = () => {
+            reject(transaction.error);
+        };
+    });
+}
+
+
 async function dbDeleteTransaction(id) {
 
     const db = await openDatabase();

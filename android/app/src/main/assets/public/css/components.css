@@ -63,8 +63,18 @@ button:active {
     display: flex;
     align-items: center;
     justify-content: center;
-    box-shadow: 0 8px 24px rgba(224, 122, 95, 0.3);
+    box-shadow: 0 8px 24px rgba(224, 122, 95, 0.35);
     z-index: 90;
+    transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.floating-add:hover {
+    transform: translateY(-2px) scale(1.05);
+    box-shadow: 0 12px 28px rgba(224, 122, 95, 0.45);
+}
+
+.floating-add:active {
+    transform: scale(0.92);
 }
 
 .form-label {
@@ -85,27 +95,33 @@ input, select, textarea {
     font-size: 1rem;
     color: var(--text-main);
     margin-top: 6px;
-    transition: border-color 0.2s, box-shadow 0.2s;
+    transition: border-color 0.2s, box-shadow 0.2s, background-color 0.2s;
 }
 
 input:focus, select:focus, textarea:focus {
     outline: none;
     border-color: var(--accent);
-    box-shadow: 0 0 0 3px rgba(224, 122, 95, 0.1);
+    box-shadow: 0 0 0 3px rgba(224, 122, 95, 0.14);
 }
 
 .modal-overlay {
     position: fixed;
     inset: 0;
-    background-color: rgba(44, 54, 63, 0.4);
-    backdrop-filter: blur(4px);
+    background-color: rgba(30, 36, 44, 0.48);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
     z-index: 200;
     display: none;
     align-items: flex-end;
     justify-content: center;
+    opacity: 0;
+    transition: opacity 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.modal-overlay.active { display: flex; }
+.modal-overlay.active {
+    display: flex;
+    opacity: 1;
+}
 
 .modal {
     background-color: var(--bg-dominant);
@@ -115,15 +131,27 @@ input:focus, select:focus, textarea:focus {
     overflow-y: auto;
     border-radius: var(--radius-lg) var(--radius-lg) 0 0;
     padding: 24px;
-    box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 -12px 36px rgba(0, 0, 0, 0.16);
+    animation: modalSlideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes modalSlideUp {
+    from {
+        transform: translateY(100%);
+        opacity: 0.7;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
 }
 
 .modal-handle {
-    width: 40px;
-    height: 4px;
+    width: 44px;
+    height: 5px;
     background-color: var(--border-soft);
-    border-radius: 2px;
-    margin: 0 auto 24px auto;
+    border-radius: 3px;
+    margin: 0 auto 20px auto;
 }
 
 .modal-header {
@@ -146,34 +174,48 @@ input:focus, select:focus, textarea:focus {
     display: flex;
     align-items: center;
     justify-content: center;
+    transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.2s;
+}
+
+.modal-close:hover {
+    transform: rotate(90deg) scale(1.08);
+    color: var(--text-main);
+}
+
+.modal-close:active {
+    transform: scale(0.9);
 }
 
 .toast {
     position: fixed;
     top: 24px;
     left: 50%;
-    transform: translateX(-50%) translateY(-100px);
+    transform: translateX(-50%) translateY(-100px) scale(0.95);
     background-color: #FFFFFF;
     color: #1F2937;
     padding: 12px 24px;
     border-radius: 30px;
     font-size: 0.9rem;
     font-weight: 600;
-    box-shadow: 0 12px 32px rgba(44, 54, 63, 0.16), 0 4px 8px rgba(44, 54, 63, 0.08);
+    box-shadow: 0 16px 36px rgba(44, 54, 63, 0.18), 0 4px 10px rgba(44, 54, 63, 0.08);
     z-index: 300;
-    transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.2s ease, color 0.2s ease;
+    transition: transform 0.32s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.25s ease, background-color 0.2s ease, color 0.2s ease;
     pointer-events: none;
     border: 1px solid #E5E7EB;
+    opacity: 0;
 }
 
 [data-theme="dark"] .toast {
     background-color: #242B36;
     color: #F9FAFB;
     border: 1px solid #3B4656;
-    box-shadow: 0 14px 32px rgba(0, 0, 0, 0.65);
+    box-shadow: 0 16px 36px rgba(0, 0, 0, 0.7);
 }
 
-.toast.show { transform: translateX(-50%) translateY(0); }
+.toast.show {
+    transform: translateX(-50%) translateY(0) scale(1);
+    opacity: 1;
+}
 
 /* ============================
    TRANSACTION MODAL UI
@@ -459,7 +501,18 @@ input:focus, select:focus, textarea:focus {
     color: var(--text-main);
     white-space: nowrap;
     flex-shrink: 0;
-    transition: all 0.15s ease;
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    cursor: pointer;
+}
+
+.cat-pill:hover {
+    border-color: rgba(224, 122, 95, 0.4);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.cat-pill:active {
+    transform: scale(0.95);
 }
 
 .cat-pill-icon {
@@ -469,6 +522,7 @@ input:focus, select:focus, textarea:focus {
     align-items: center;
     justify-content: center;
     color: var(--text-muted);
+    transition: transform 0.2s ease, color 0.2s ease;
 }
 
 .cat-pill-icon svg {
@@ -482,10 +536,12 @@ input:focus, select:focus, textarea:focus {
     border-color: var(--accent);
     color: var(--accent);
     font-weight: 600;
+    box-shadow: 0 2px 8px rgba(224, 122, 95, 0.15);
 }
 
 .cat-pill.active .cat-pill-icon {
     color: var(--accent);
+    transform: scale(1.1);
 }
 
 .form-select-styled {
@@ -527,11 +583,18 @@ input:focus, select:focus, textarea:focus {
     color: var(--text-main);
     white-space: nowrap;
     flex-shrink: 0;
-    transition: all 0.15s ease;
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    cursor: pointer;
 }
 
 .account-chip:hover {
-    border-color: var(--text-muted);
+    border-color: rgba(224, 122, 95, 0.4);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.account-chip:active {
+    transform: scale(0.95);
 }
 
 .acc-chip-icon {
@@ -541,6 +604,7 @@ input:focus, select:focus, textarea:focus {
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
+    transition: transform 0.2s ease;
 }
 
 .acc-chip-icon svg {
@@ -552,12 +616,17 @@ input:focus, select:focus, textarea:focus {
     border-color: var(--accent);
     background-color: var(--bg-secondary);
     color: var(--accent);
-    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+    box-shadow: 0 2px 8px rgba(224, 122, 95, 0.15);
+}
+
+.account-chip.active .acc-chip-icon {
+    transform: scale(1.08);
 }
 
 .account-chip.active.income-active {
     border-color: var(--income);
     color: var(--income);
+    box-shadow: 0 2px 8px rgba(62, 142, 104, 0.15);
 }
 
 .account-input-box input {

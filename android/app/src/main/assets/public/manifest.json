@@ -4,8 +4,8 @@
   "description": "Personal expense tracking and budget management web application with category breakdown, spending analytics, and SMS transaction tracking.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#0f1117",
-  "theme_color": "#0f1117",
+  "background_color": "#F9F8F6",
+  "theme_color": "#E07A5F",
   "icons": [
     {
       "src": "/assets/icon.svg",

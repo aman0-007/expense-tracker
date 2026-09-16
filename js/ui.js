@@ -491,6 +491,9 @@ function updateSettingsUI() {
     const theme = AppState.settings.appearance === "dark" ? "dark" : "light";
     document.documentElement.setAttribute("data-theme", theme);
     document.body.setAttribute("data-theme", theme);
+    if (typeof updateStatusBarTheme === "function") {
+        updateStatusBarTheme(theme);
+    }
 
     // Update all currency-symbol inline spans
     document.querySelectorAll(".currency-symbol").forEach(el => {
@@ -512,7 +515,11 @@ function populateCategories() {
     const type = AppState.transactionType || "expense";
     
     const filtered = (AppState.categories || []).filter(cat => {
-        const isIncome = (cat.name || "").toLowerCase() === "income" || cat.type === "income";
+        const catNameLower = (cat.name || "").toLowerCase();
+        if (cat.type === "both" || catNameLower === "investments" || catNameLower === "investment") {
+            return true;
+        }
+        const isIncome = catNameLower === "income" || cat.type === "income";
         return type === "income" ? isIncome : !isIncome;
     });
 
@@ -565,6 +572,8 @@ function updateSuggestionsBar(type) {
     if (!container) return;
 
     const expenseSuggestions = [
+        { name: "SIP / Mutual Fund", cat: "Investments" },
+        { name: "Stocks / Demat", cat: "Investments" },
         { name: "Groceries", cat: "Groceries" },
         { name: "Swiggy / Food", cat: "Food" },
         { name: "Amazon Shopping", cat: "Shopping" },
@@ -576,8 +585,9 @@ function updateSuggestionsBar(type) {
 
     const incomeSuggestions = [
         { name: "Monthly Salary", cat: "Salary" },
-        { name: "Freelance Project", cat: "Freelance" },
         { name: "Stock Dividend", cat: "Investments" },
+        { name: "Mutual Fund Return", cat: "Investments" },
+        { name: "Freelance Project", cat: "Freelance" },
         { name: "Business Revenue", cat: "Business" },
         { name: "Rental Income", cat: "Rental" },
         { name: "Cashback / Refund", cat: "Refund & Cashback" },

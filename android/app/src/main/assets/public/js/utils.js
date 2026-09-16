@@ -126,6 +126,10 @@ const CATEGORY_SVG_MAP = {
     "Salary": `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"></rect><line x1="2" y1="10" x2="22" y2="10"></line><circle cx="7" cy="15" r="1"></circle><path d="M14 15h4"></path></svg>`,
     "Freelance": `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path></svg>`,
     "Investments": `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline><polyline points="17 6 23 6 23 12"></polyline></svg>`,
+    "Investment": `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline><polyline points="17 6 23 6 23 12"></polyline></svg>`,
+    "SIP": `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline><polyline points="17 6 23 6 23 12"></polyline></svg>`,
+    "Mutual Funds": `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline><polyline points="17 6 23 6 23 12"></polyline></svg>`,
+    "Stocks": `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline><polyline points="17 6 23 6 23 12"></polyline></svg>`,
     "Business": `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"></path><path d="M9 8h1"></path><path d="M9 12h1"></path><path d="M9 16h1"></path><path d="M14 8h1"></path><path d="M14 12h1"></path><path d="M14 16h1"></path><path d="M5 21V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16"></path></svg>`,
     "Rental": `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>`,
     "Refunds": `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"></polyline><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg>`,
@@ -314,3 +318,29 @@ function showToast(message) {
         }, 2200);
 
 }
+
+function updateStatusBarTheme(theme) {
+    const isDark = theme === "dark";
+    const barColor = isDark ? "#111318" : "#F9F8F6";
+
+    // Synchronize HTML theme-color meta tags for mobile browsers / PWAs
+    document.querySelectorAll('meta[name="theme-color"]').forEach(el => {
+        el.setAttribute("content", barColor);
+    });
+
+    // Synchronize iOS Safari status bar
+    const appleMeta = document.getElementById("apple-status-bar-meta") || document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]');
+    if (appleMeta) {
+        appleMeta.setAttribute("content", isDark ? "black-translucent" : "default");
+    }
+
+    // Synchronize Android Native Status Bar & Navigation Bar via AndroidBridge
+    if (window.AndroidBridge && typeof window.AndroidBridge.setStatusBarTheme === "function") {
+        try {
+            window.AndroidBridge.setStatusBarTheme(theme);
+        } catch (e) {
+            console.warn("AndroidBridge setStatusBarTheme failed:", e);
+        }
+    }
+}
+
