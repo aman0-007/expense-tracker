@@ -1,0 +1,16 @@
+{
+  "name": "expense-tracker",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node server.js",
+    "start": "node server.js",
+    "lint": "node -c js/*.js",
+    "sync:android": "mkdir -p android/app/src/main/assets/public && cp -r index.html css js assets android/app/src/main/assets/public/ && cp -r assests android/app/src/main/assets/public/ 2>/dev/null || true",
+    "build": "mkdir -p dist && cp -r index.html css js assets dist/ 2>/dev/null || true && cp -r assests dist/ 2>/dev/null || true"
+  },
+  "dependencies": {
+    "express": "^4.21.2"
+  }
+}

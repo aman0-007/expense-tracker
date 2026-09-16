@@ -1,0 +1,6 @@
+{
+  "name": "Expense Tracker",
+  "description": "Personal expense tracking and budget management web application with category breakdown, spending analytics, and transaction history.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
