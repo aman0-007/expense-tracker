@@ -106,8 +106,8 @@ public class MainActivity extends AppCompatActivity {
                 json.put("date", timestamp);
                 String script = "if (window.onNativeSmsReceived) { window.onNativeSmsReceived(" + json.toString() + "); }";
                 activity.webView.evaluateJavascript(script, null);
-            } catch (Exception e) {
-                e.printStackTrace();
+            } catch (Exception ignored) {
+                // Keep zero logging of SMS contents
             }
         });
     }
@@ -170,11 +170,15 @@ public class MainActivity extends AppCompatActivity {
             }
 
             JSONArray messages = new JSONArray();
-            // Intelligent limit: If limit <= 0:
-            // Incremental sync (sinceTimestamp > 0): max 100 candidate financial messages
-            // Initial sync (sinceTimestamp <= 0): max 250 candidate financial messages within the last 90 days
-            int maxCandidates = limit > 0 ? limit : (sinceTimestamp > 0 ? 100 : 250);
-            long minAllowedDate = sinceTimestamp > 0 ? sinceTimestamp : (System.currentTimeMillis() - (90L * 24L * 60L * 60L * 1000L));
+            // Fetch all messages when limit <= 0 without arbitrary capping
+            int maxCandidates = limit > 0 ? limit : 50000;
+
+            String selection = null;
+            String[] selectionArgs = null;
+            if (sinceTimestamp > 0) {
+                selection = "date > ?";
+                selectionArgs = new String[]{String.valueOf(sinceTimestamp)};
+            }
 
             Uri[] candidateUris = new Uri[]{
                     Uri.parse("content://sms/inbox"),
@@ -186,8 +190,6 @@ public class MainActivity extends AppCompatActivity {
 
                 try {
                     String[] projection = new String[]{"_id", "address", "body", "date"};
-                    String selection = "date > ?";
-                    String[] selectionArgs = new String[]{String.valueOf(minAllowedDate)};
 
                     // Query sorted by date DESC
                     Cursor cursor = context.getContentResolver().query(
@@ -207,7 +209,7 @@ public class MainActivity extends AppCompatActivity {
 
                             while (cursor.moveToNext() && messages.length() < maxCandidates) {
                                 long msgDate = dateCol >= 0 ? cursor.getLong(dateCol) : System.currentTimeMillis();
-                                if (msgDate <= minAllowedDate) {
+                                if (sinceTimestamp > 0 && msgDate <= sinceTimestamp) {
                                     break;
                                 }
 
@@ -218,22 +220,34 @@ public class MainActivity extends AppCompatActivity {
 
                                 String lower = body.toLowerCase(java.util.Locale.ROOT);
 
-                                // 1. Fast Native Exclusion: Skip OTPs, verification codes, logins, reminders
+                                // 1. Fast Native Exclusion: Skip OTPs, verification codes, logins, upcoming debits, autopay schedules, mandates, payment reminders
                                 if (lower.contains("otp") || lower.contains("verification code") ||
                                     lower.contains("do not share") || lower.contains("login password") ||
-                                    lower.contains("secret code") || lower.contains("will be debited") ||
-                                    lower.contains("upcoming payment") || lower.contains("sufficient balance") ||
-                                    lower.contains("scheduled to") || lower.contains("mandate created")) {
+                                    lower.contains("secret code") || lower.contains("m-pin") || lower.contains("upi pin") ||
+                                    lower.contains("will be debited") || lower.contains("shall be debited") || lower.contains("would be debited") ||
+                                    lower.contains("upcoming payment") || lower.contains("upcoming debit") || lower.contains("upcoming sip") ||
+                                    lower.contains("is scheduled") || lower.contains("scheduled on") || lower.contains("scheduled for") || lower.contains("scheduled to") ||
+                                    lower.contains("autopay for") || lower.contains("autopay request") ||
+                                    lower.contains("mandate set up") || lower.contains("mandate created") || lower.contains("mandate registered") ||
+                                    lower.contains("mandate approved") || lower.contains("mandate request") || lower.contains("e-mandate") ||
+                                    lower.contains("ensure sufficient balance") || lower.contains("sufficient balance in your") || lower.contains("maintain sufficient balance") ||
+                                    lower.contains("payment reminder") || lower.contains("bill reminder") || lower.contains("due date is") || lower.contains("is due on") ||
+                                    lower.contains("requested money") || lower.contains("payment request") ||
+                                    lower.contains("pre-approved") || lower.contains("apply now") ||
+                                    lower.contains("credit limit") ||
+                                    lower.contains("transaction failed") || lower.contains("payment failed") || lower.contains("declined") || lower.contains("unsuccessful")) {
                                     continue;
                                 }
 
                                 // 2. Fast Native Inclusion: Must contain an executed financial keyword
                                 boolean isFin = lower.contains("debited") || lower.contains("credited") ||
                                                 lower.contains("spent") || lower.contains("paid") ||
-                                                lower.contains("withdrawn") || lower.contains("transferred") ||
+                                                lower.contains("withdrawn") || lower.contains("transferred") || lower.contains("trf to") ||
                                                 lower.contains("refund") || lower.contains("cashback") ||
-                                                lower.contains("received rs") || lower.contains("received inr") ||
-                                                lower.contains("dr ") || lower.contains("cr ") ||
+                                                lower.contains("received rs") || lower.contains("received inr") || lower.contains("deposited") ||
+                                                lower.contains("dr ") || lower.contains("dr.") || lower.contains("cr ") || lower.contains("cr.") ||
+                                                lower.contains("sent rs") || lower.contains("sent inr") || lower.contains("sent to") ||
+                                                lower.contains("purchase") || lower.contains("used at") ||
                                                 lower.contains("sip") || lower.contains("mutual fund");
 
                                 if (!isFin) {
@@ -251,8 +265,8 @@ public class MainActivity extends AppCompatActivity {
                             cursor.close();
                         }
                     }
-                } catch (Exception e) {
-                    e.printStackTrace();
+                } catch (Exception ignored) {
+                    // Do not log sensitive SMS content
                 }
             }
 

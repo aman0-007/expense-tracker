@@ -1,430 +1,4 @@
-/* =========================================================
-   SMS TRACKING & NATIVE ANDROID BRIDGE
-   Reads financial SMS from Android device inbox or real-time broadcast.
-   Parses Indian bank alerts (SBI, HDFC, ICICI, BOB, UPI, etc.).
-========================================================= */
-
-let isSmsWatching = false;
-
-// Sample bank SMS messages for browser demo / testing mode
-const SAMPLE_DEVICE_BANK_SMS = [
-    {
-        id: "sms_user_1",
-        address: "VK-SBIINB",
-        body: "Dear UPI user A/C X3407 debited by 189.00 on date 12Sep26 trf to Reliance Retail Refno 625515721424 If not u? call-1800111109 for other services-18001234-SBI",
-        date: Date.parse("2026-09-12T14:30:00Z")
-    },
-    {
-        id: "sms_user_2",
-        address: "VK-SBIINB",
-        body: "Dear UPI user A/C X3407 debited by 11.00 on date 02Sep26 trf to Jio Prepaid Rech Refno 624534435350 If not u? call-1800111109 for other services-18001234-SBI",
-        date: Date.parse("2026-09-02T10:15:00Z")
-    },
-    {
-        id: "sms_user_3",
-        address: "VK-SBIINB",
-        body: "Dear UPI user A/C X3407 debited by 330.00 on date 28Jun26 trf to GEETA CHAURASIYA Refno 117323581796 If not u? call-1800111109 for other services-18001234-SBI",
-        date: Date.parse("2026-06-28T19:40:00Z")
-    },
-    {
-        id: "sms_user_4",
-        address: "VK-SBIINB",
-        body: "Dear UPI user A/C X3407 debited by 226.00 on date 15Sep26 trf to NIMAI DAS AGENCY Refno 567264362586 If not u? call-1800111109 for other services-18001234-SBI",
-        date: Date.parse("2026-09-15T12:20:00Z")
-    },
-    {
-        id: "sms_user_6",
-        address: "VK-SBIINB",
-        body: "Dear UPI user A/C X3407 debited by 490.00 on date 06Sep26 trf to Indian Railways Refno 852117152496 If not u? call-1800111109 for other services-18001234-SBI",
-        date: Date.parse("2026-09-06T08:50:00Z")
-    },
-    {
-        id: "sms_user_8",
-        address: "VK-SBIINB",
-        body: "Dear Customer, Your a/c no. XXXXXXXX3407 is credited by Rs.37300.00 on 01-08-26 by a/c linked to mobile 7XXXXXX919-SELECT AI  (IMPS Ref# 621309006645)-SBI",
-        date: Date.parse("2026-08-01T11:00:00Z")
-    },
-    {
-        id: "sms_user_9",
-        address: "VK-SBIINB",
-        body: "Dear SBI Customer, Rs.10000 withdrawn at HIB ATM HCB02801 from A/cX3407 on 26Jun26 Transaction Number 617719001821. Available Balance Rs.6247.30. If not withdrawn by you, forward this SMS to 7400165218 / call 1800111109 or 09449112211 to block your card. Call 18001234 if cash not received.",
-        date: Date.parse("2026-06-26T17:15:00Z")
-    },
-    {
-        id: "sms_sim_1",
-        address: "VM-HDFCBK",
-        body: "Rs 640.00 debited from HDFC Bank A/C **8910 on 15-AUG-26 to SWIGGY. Info: UPI-349102. Avl Bal: Rs 42,310.00.",
-        date: Date.parse("2026-08-15T20:10:00Z")
-    },
-    {
-        id: "sms_sim_3",
-        address: "AD-ICICIB",
-        body: "Your A/C XXXXXX1029 is debited with INR 299.00 on 12-Aug-26. Info: UPI/321456/NETFLIX. Avl Bal: INR 15,000.00",
-        date: Date.parse("2026-08-12T16:05:00Z")
-    }
-];
-
-function initSmsTracking() {
-    const smsToggle = document.getElementById("smsTrackingToggle");
-    const syncBtn = document.getElementById("syncSmsInboxBtn");
-    const subtitle = document.getElementById("smsStatusSubtitle");
-
-    const hasNativeBridge = Boolean(window.AndroidBridge);
-
-    if (smsToggle) {
-        smsToggle.disabled = false;
-        
-        // Restore saved preference (default to active if native bridge is available)
-        const savedTracking = localStorage.getItem("expense_sms_tracking");
-        const shouldTrack = savedTracking === null ? hasNativeBridge : savedTracking === "true";
-        
-        if (shouldTrack) {
-            smsToggle.checked = true;
-            startSmsWatching(false);
-        }
-
-        smsToggle.addEventListener("change", (e) => {
-            if (e.target.checked) {
-                startSmsWatching(true);
-            } else {
-                stopSmsWatching();
-            }
-        });
-    }
-
-    if (syncBtn) {
-        syncBtn.addEventListener("click", () => {
-            syncDeviceSmsInbox(true, false);
-        });
-    }
-
-    if (subtitle) {
-        if (hasNativeBridge) {
-            subtitle.textContent = "Native Android SMS bridge connected";
-        } else {
-            subtitle.textContent = "Active in Android APK (tap to test demo)";
-        }
-    }
-
-    // Auto-sync on app launch if permission is already granted
-    if (hasNativeBridge && typeof window.AndroidBridge.hasSmsPermission === "function") {
-        setTimeout(() => {
-            try {
-                if (window.AndroidBridge.hasSmsPermission()) {
-                    syncDeviceSmsInbox(false, true /* silent auto-catchup */);
-                }
-            } catch (_) {}
-        }, 1200);
-    }
-
-    // Auto-sync whenever user returns to the app (e.g. after making a payment in GPay/PhonePe)
-    document.addEventListener("visibilitychange", () => {
-        if (document.visibilityState === "visible" && hasNativeBridge) {
-            try {
-                if (typeof window.AndroidBridge.hasSmsPermission === "function" && window.AndroidBridge.hasSmsPermission()) {
-                    syncDeviceSmsInbox(false, true /* silent auto-catchup */);
-                }
-            } catch (_) {}
-        }
-    });
-}
-
-/**
- * Start listening for incoming SMS alerts
- */
-function startSmsWatching(promptUser = true) {
-    if (window.AndroidBridge && typeof window.AndroidBridge.startSmsWatch === "function") {
-        try {
-            window.AndroidBridge.startSmsWatch();
-            isSmsWatching = true;
-            localStorage.setItem("expense_sms_tracking", "true");
-            if (promptUser) showToast("Android SMS auto-detection active");
-            return;
-        } catch (e) {
-            // Suppress logging
-        }
-    }
-
-    // Cordova/Capacitor plugin fallback
-    if (window.plugins && window.plugins.smsReceive) {
-        window.plugins.smsReceive.requestPermission(
-            function() {
-                window.plugins.smsReceive.startWatch(
-                    function() {
-                        isSmsWatching = true;
-                        localStorage.setItem("expense_sms_tracking", "true");
-                        if (promptUser) showToast("SMS tracking active");
-                        document.addEventListener("onSMSArrive", onSmsArriveEvent);
-                    },
-                    function() {
-                        if (promptUser) showToast("Failed to start SMS tracking");
-                        resetToggle();
-                    }
-                );
-            },
-            function() {
-                if (promptUser) showToast("SMS Permission denied");
-                resetToggle();
-            }
-        );
-        return;
-    }
-
-    // Browser Preview mode
-    isSmsWatching = true;
-    localStorage.setItem("expense_sms_tracking", "true");
-    if (promptUser) {
-        showToast("SMS detection enabled (native bridge ready)");
-    }
-}
-
-function stopSmsWatching() {
-    isSmsWatching = false;
-    localStorage.setItem("expense_sms_tracking", "false");
-
-    if (window.AndroidBridge && typeof window.AndroidBridge.stopSmsWatch === "function") {
-        try {
-            window.AndroidBridge.stopSmsWatch();
-        } catch (_) {}
-    }
-
-    if (window.plugins && window.plugins.smsReceive) {
-        window.plugins.smsReceive.stopWatch(function() {}, function() {});
-        document.removeEventListener("onSMSArrive", onSmsArriveEvent);
-    }
-
-    showToast("SMS tracking paused");
-}
-
-function resetToggle() {
-    const toggle = document.getElementById("smsTrackingToggle");
-    if (toggle) toggle.checked = false;
-    localStorage.setItem("expense_sms_tracking", "false");
-}
-
-function onSmsArriveEvent(e) {
-    if (e && e.data) {
-        handleIncomingSmsData(e.data);
-    }
-}
-
-// Global callback invoked by Android native Java/Kotlin bridge
-window.onNativeSmsReceived = async function(smsData) {
-    if (!smsData) return;
-    try {
-        const parsed = typeof smsData === "string" ? JSON.parse(smsData) : smsData;
-        await handleIncomingSmsData(parsed);
-    } catch (_) {
-        // Suppress logging
-    }
-};
-
-/**
- * Parses and saves incoming SMS transaction
- */
-async function handleIncomingSmsData(sms) {
-    if (!sms || !sms.body) return;
-    const parsedTx = parseFinancialSms(sms);
-    if (!parsedTx) return;
-
-    // If this is the first real transaction and dummy transactions are present, clear dummy
-    if (window.clearDummyTransactions) {
-        const hasDummy = (AppState.transactions || []).some(t => t.source === "dummy" || (t.id && t.id.startsWith("dummy-")));
-        if (hasDummy) {
-            await window.clearDummyTransactions();
-        }
-    }
-
-    // Record latest SMS timestamp checkpoint
-    if (sms.date) {
-        const currentCheck = parseInt(localStorage.getItem("expense_last_sms_sync_ts") || "0", 10);
-        if (sms.date > currentCheck) {
-            localStorage.setItem("expense_last_sms_sync_ts", String(sms.date));
-        }
-    }
-
-    // Check for duplicate transaction
-    const exists = (AppState.transactions || []).some(t => {
-        return (t.smsId && t.smsId === parsedTx.smsId) || 
-               (t.amount === parsedTx.amount && t.date === parsedTx.date && t.merchant === parsedTx.merchant);
-    });
-
-    if (exists) return;
-
-    await saveTransaction(parsedTx);
-
-    if (typeof renderApplication === "function") {
-        renderApplication();
-    } else if (typeof renderTransactions === "function" && AppState.currentPage === "transactions") {
-        renderTransactions();
-    }
-
-    const sign = parsedTx.type === "income" ? "+" : "−";
-    showToast(`SMS: ${sign}₹${parsedTx.amount.toLocaleString("en-IN")} logged (${parsedTx.merchant})`);
-
-    if (typeof triggerNativeHaptic === "function") {
-        triggerNativeHaptic("medium");
-    }
-}
-
-/**
- * Scan device SMS inbox (optimized with incremental sync)
- * @param {boolean} forceFullSync - Whether to re-scan all inbox messages regardless of timestamp
- * @param {boolean} isSilent - Whether to suppress toasts when no new messages are detected
- */
-async function syncDeviceSmsInbox(forceFullSync = false, isSilent = false) {
-    const isNative = Boolean(window.AndroidBridge);
-    if (!isSilent) {
-        showToast("Checking bank SMS for new transactions...");
-    }
-
-    let smsList = [];
-    let lastSyncTs = 0;
-
-    const hasExistingSmsTransactions = (AppState.transactions || []).some(t => t.source === "sms");
-    if (!forceFullSync && hasExistingSmsTransactions) {
-        lastSyncTs = parseInt(localStorage.getItem("expense_last_sms_sync_ts") || "0", 10);
-    }
-
-    // 1. Check if running in Native Android app with AndroidBridge
-    if (isNative && typeof window.AndroidBridge.readInboxSms === "function") {
-        try {
-            if (typeof window.AndroidBridge.hasSmsPermission === "function" && !window.AndroidBridge.hasSmsPermission()) {
-                if (!isSilent) {
-                    showToast("SMS permission required. Please allow in the prompt...");
-                }
-                window.AndroidBridge.requestSmsPermission();
-                return;
-            }
-
-            let rawJson;
-            if (typeof window.AndroidBridge.readInboxSmsSince === "function") {
-                // 0 limit indicates fetch all messages
-                rawJson = window.AndroidBridge.readInboxSmsSince(lastSyncTs, 0);
-            } else {
-                rawJson = window.AndroidBridge.readInboxSms(0);
-            }
-
-            if (rawJson === "PERMISSION_REQUESTED") {
-                if (!isSilent) {
-                    showToast("Please allow SMS access in the system dialog...");
-                }
-                return;
-            }
-            if (rawJson && rawJson.trim().startsWith("[")) {
-                smsList = JSON.parse(rawJson);
-            }
-        } catch (_) {
-            // Suppress logging
-        }
-
-        // On Native Android, if no messages found:
-        if (!smsList || smsList.length === 0) {
-            if (!isSilent) {
-                showToast(lastSyncTs > 0 ? "Bank transactions are up-to-date." : "No SMS found in phone inbox.");
-            }
-            return;
-        }
-    } else {
-        // Standalone browser preview demo fallback
-        smsList = SAMPLE_DEVICE_BANK_SMS;
-    }
-
-    // Update timestamp checkpoint based on latest message received
-    const maxTs = smsList.reduce((max, s) => Math.max(max, Number(s.date) || 0), 0);
-    if (maxTs > 0) {
-        localStorage.setItem("expense_last_sms_sync_ts", String(maxTs));
-    }
-
-    let importedCount = 0;
-    const parsedValidList = [];
-
-    // Yield to browser event loop to guarantee 60fps UI responsiveness
-    const yieldToEventLoop = () => new Promise(resolve => setTimeout(resolve, 0));
-
-    // Time-sliced batch parsing (25 messages per chunk)
-    const BATCH_SIZE = 25;
-    for (let i = 0; i < smsList.length; i += BATCH_SIZE) {
-        const batch = smsList.slice(i, i + BATCH_SIZE);
-        for (const sms of batch) {
-            const parsedTx = parseFinancialSms(sms);
-            if (parsedTx) {
-                parsedValidList.push(parsedTx);
-            }
-        }
-        if (smsList.length > BATCH_SIZE) {
-            await yieldToEventLoop();
-        }
-    }
-
-    if (parsedValidList.length === 0) {
-        if (!isSilent) {
-            showToast("No new bank alerts detected in recent SMS.");
-        }
-        return;
-    }
-
-    // Clean up pre-existing fake dummy data if this is a native Android sync
-    if (isNative && window.clearDummyTransactions) {
-        await window.clearDummyTransactions();
-    }
-
-    // Fast O(1) deduplication check using Set indices
-    const existingIds = new Set((AppState.transactions || []).map(t => t.smsId).filter(Boolean));
-    const existingSignatures = new Set((AppState.transactions || []).map(t => `${t.amount}_${t.date}_${t.merchant}`));
-    const newTransactionsToSave = [];
-
-    for (const parsedTx of parsedValidList) {
-        const hasIdMatch = parsedTx.smsId && existingIds.has(parsedTx.smsId);
-        const hasSigMatch = existingSignatures.has(`${parsedTx.amount}_${parsedTx.date}_${parsedTx.merchant}`);
-
-        if (!hasIdMatch && !hasSigMatch) {
-            newTransactionsToSave.push(parsedTx);
-            if (parsedTx.smsId) existingIds.add(parsedTx.smsId);
-            existingSignatures.add(`${parsedTx.amount}_${parsedTx.date}_${parsedTx.merchant}`);
-        }
-    }
-
-    // Batch persist all new transactions in a single transaction & single render
-    if (newTransactionsToSave.length > 0) {
-        if (typeof saveTransactionsBatch === "function") {
-            await saveTransactionsBatch(newTransactionsToSave);
-        } else {
-            for (const item of newTransactionsToSave) {
-                await saveTransaction(item);
-            }
-        }
-        importedCount = newTransactionsToSave.length;
-    }
-
-    if (importedCount > 0) {
-        showToast(`Synced ${importedCount} new transaction${importedCount > 1 ? "s" : ""} from bank SMS!`);
-        if (window.triggerNativeHaptic) {
-            window.triggerNativeHaptic("medium");
-        }
-    } else if (!isSilent) {
-        showToast("All bank SMS transactions are already up-to-date.");
-    }
-}
-
-/**
- * Android Permission Callback - called from MainActivity.java
- */
-window.onSmsPermissionResult = function(granted) {
-    if (granted) {
-        showToast("Permission granted! Scanning SMS inbox now...");
-        setTimeout(() => {
-            syncDeviceSmsInbox(true, false);
-        }, 300);
-    } else {
-        showToast("SMS permission denied. Enable in Phone Settings to auto-track.");
-    }
-};
-
-/**
- * Parse date string directly from SMS body text
- * Formats: 12Sep26, 12-Sep-26, 12-08-26, 01/08/2026, 26Jun26
- */
+// Test suite for bank SMS regex parser
 function parseDateFromText(text) {
     if (!text) return null;
     const months = {
@@ -462,11 +36,6 @@ function parseDateFromText(text) {
     return null;
 }
 
-/**
- * Robust regex parser for Indian Banking & Financial SMS
- * Handles SBI, HDFC, ICICI, BOB, AXIS, KOTAK, PNB, CANARA, UPI, PAYTM, PHONEPE, GPAY,
- * and Investment platforms (Angel One, Zerodha, Groww, Upstox, Mutual Funds, etc.)
- */
 function parseFinancialSms(sms) {
     if (!sms || !sms.body) return null;
     const rawBody = sms.body;
@@ -563,7 +132,7 @@ function parseFinancialSms(sms) {
 
     if (!isExpense && !isIncome) return null;
     
-    // Prioritize expense unless explicitly cashback or refund
+    // If both keywords matched (rare, e.g. "debited ... cashback"), prioritize expense unless it's cashback/refund
     let type = "expense";
     if (isIncome && !isExpense) {
         type = "income";
@@ -632,6 +201,7 @@ function parseFinancialSms(sms) {
     const acctMatch = rawBody.match(/(?:a\/c\s*(?:no\.?)?|acct|ac|account|card\s*ending)\s*[:\s]*([X\*0-9]{3,16})/i);
     if (acctMatch && acctMatch[1]) {
         let rawNum = acctMatch[1].trim();
+        // Shorten long masked accounts like XXXXXXXX3407 -> X3407
         const lastDigits = rawNum.match(/([0-9]{3,4})$/);
         if (lastDigits) {
             accountCode = "X" + lastDigits[1];
@@ -779,8 +349,7 @@ function parseFinancialSms(sms) {
     }
 
     // 10. Date parsing: from text or sms.date
-    let txDate = getTodayString();
-    let txTime = getCurrentTime();
+    let txDate = "2026-09-16";
     const parsedTextDate = parseDateFromText(rawBody);
     if (parsedTextDate) {
         txDate = parsedTextDate;
@@ -788,31 +357,189 @@ function parseFinancialSms(sms) {
         const d = new Date(sms.date);
         if (!isNaN(d.getTime())) {
             txDate = d.toISOString().split("T")[0];
-            txTime = d.toTimeString().split(" ")[0].slice(0, 5);
         }
     }
 
     return {
-        id: generateId(),
-        type: type,
-        amount: amount,
-        currency: "INR",
-        merchant: merchant,
-        category: category,
-        date: txDate,
-        time: txTime,
+        amount,
+        type,
+        merchant,
+        category,
         account: bankAccount,
-        note: `Synced from ${bankAccount} SMS`,
-        source: "sms",
-        smsId: String(sms.id || (sender + "_" + amount + "_" + txDate)),
-        createdAt: new Date().toISOString()
+        date: txDate
     };
 }
 
-document.addEventListener("DOMContentLoaded", () => {
-    // Non-blocking deferred init: Allows UI, charts, and first frame to render smoothly
-    const scheduleInit = window.requestIdleCallback || ((cb) => setTimeout(cb, 1500));
-    scheduleInit(() => {
-        initSmsTracking();
-    });
-});
+// -------------------------------------------------------------
+// Test execution
+// -------------------------------------------------------------
+const testMessages = [
+    {
+        name: "User SBI Sample 1 (Reliance Retail)",
+        sms: {
+            address: "VK-SBIINB",
+            body: "Dear UPI user A/C X3407 debited by 189.00 on date 12Sep26 trf to Reliance Retail Refno 625515721424 If not u? call-1800111109 for other services-18001234-SBI"
+        },
+        expected: { valid: true, type: "expense", amount: 189, merchant: "Reliance Retail", category: "Shopping", date: "2026-09-12", account: "SBI X3407" }
+    },
+    {
+        name: "User SBI Sample 2 (Jio Recharge)",
+        sms: {
+            address: "VK-SBIINB",
+            body: "Dear UPI user A/C X3407 debited by 11.00 on date 02Sep26 trf to Jio Prepaid Rech Refno 624534435350 If not u? call-1800111109 for other services-18001234-SBI"
+        },
+        expected: { valid: true, type: "expense", amount: 11, merchant: "Jio Prepaid Rech", category: "Bills", date: "2026-09-02", account: "SBI X3407" }
+    },
+    {
+        name: "User SBI Sample 3 (Geeta Chaurasiya)",
+        sms: {
+            address: "VK-SBIINB",
+            body: "Dear UPI user A/C X3407 debited by 330.00 on date 28Jun26 trf to GEETA CHAURASIYA Refno 117323581796 If not u? call-1800111109 for other services-18001234-SBI"
+        },
+        expected: { valid: true, type: "expense", amount: 330, merchant: "GEETA CHAURASIYA", date: "2026-06-28", account: "SBI X3407" }
+    },
+    {
+        name: "User SBI Sample 4 (Nimai Das Agency)",
+        sms: {
+            address: "VK-SBIINB",
+            body: "Dear UPI user A/C X3407 debited by 226.00 on date 15Sep26 trf to NIMAI DAS AGENCY Refno 567264362586 If not u? call-1800111109 for other services-18001234-SBI"
+        },
+        expected: { valid: true, type: "expense", amount: 226, merchant: "NIMAI DAS AGENCY", date: "2026-09-15", account: "SBI X3407" }
+    },
+    {
+        name: "User SBI Sample 5 (NEGATIVE: Scheduled AutoPay)",
+        sms: {
+            address: "VK-SBIINB",
+            body: "Dear UPI User, UPI AutoPay for ANGEL ONE MUTUL FUND debit of Rs.200.00 is scheduled on .18/09/26, daf519ecdee14cdbae2c3ef9ca31b4d3@okicici. Please ensure sufficient balance in your account. -SBI --- not this one**"
+        },
+        expected: { valid: false }
+    },
+    {
+        name: "User SBI Sample 6 (Indian Railways)",
+        sms: {
+            address: "VK-SBIINB",
+            body: "Dear UPI user A/C X3407 debited by 490.00 on date 06Sep26 trf to Indian Railways Refno 852117152496 If not u? call-1800111109 for other services-18001234-SBI"
+        },
+        expected: { valid: true, type: "expense", amount: 490, merchant: "Indian Railways", category: "Transport", date: "2026-09-06", account: "SBI X3407" }
+    },
+    {
+        name: "User Axis Sample 7 (NEGATIVE: Mandate Set Up)",
+        sms: {
+            address: "VK-AXISBK",
+            body: "UPI mandate set up for NAUKRI COM for INR 750.00. Not you? Call us on 18001035577 - Axis Bank-- not this also"
+        },
+        expected: { valid: false }
+    },
+    {
+        name: "User SBI Sample 8 (Salary / IMPS Credit)",
+        sms: {
+            address: "VK-SBIINB",
+            body: "Dear Customer, Your a/c no. XXXXXXXX3407 is credited by Rs.37300.00 on 01-08-26 by a/c linked to mobile 7XXXXXX919-SELECT AI  (IMPS Ref# 621309006645)-SBI"
+        },
+        expected: { valid: true, type: "income", amount: 37300, merchant: "SELECT AI", date: "2026-08-01", account: "SBI X3407" }
+    },
+    {
+        name: "User SBI Sample 9 (ATM Cash Withdrawal)",
+        sms: {
+            address: "VK-SBIINB",
+            body: "Dear SBI Customer, Rs.10000 withdrawn at HIB ATM HCB02801 from A/cX3407 on 26Jun26 Transaction Number 617719001821. Available Balance Rs.6247.30. If not withdrawn by you, forward this SMS to 7400165218 / call 1800111109 or 09449112211 to block your card. Call 18001234 if cash not received."
+        },
+        expected: { valid: true, type: "expense", amount: 10000, merchant: "HIB ATM HCB02801", category: "Cash", date: "2026-06-26", account: "SBI X3407" }
+    },
+    {
+        name: "HDFC UPI Swiggy",
+        sms: {
+            address: "VM-HDFCBK",
+            body: "Rs 640.00 debited from HDFC Bank A/C **8910 on 15-AUG-26 to SWIGGY. Info: UPI-349102. Avl Bal: Rs 42,310.00."
+        },
+        expected: { valid: true, type: "expense", amount: 640, merchant: "SWIGGY", category: "Food", date: "2026-08-15", account: "HDFC Bank X8910" }
+    },
+    {
+        name: "ICICI Netflix",
+        sms: {
+            address: "AD-ICICIB",
+            body: "Your A/C XXXXXX1029 is debited with INR 299.00 on 12-Aug-26. Info: UPI/321456/NETFLIX. Avl Bal: INR 15,000.00"
+        },
+        expected: { valid: true, type: "expense", amount: 299, merchant: "NETFLIX", category: "Entertainment", date: "2026-08-12", account: "ICICI Bank X1029" }
+    },
+    {
+        name: "Angel One Demat",
+        sms: {
+            address: "AD-ANGONE",
+            body: "Dear Client, Rs. 5000.00 debited from Bank A/c for Angel One demat fund transfer on 10-Sep-26. UPI Ref 45678."
+        },
+        expected: { valid: true, type: "expense", amount: 5000, merchant: "Angel One", category: "Investments", date: "2026-09-10" }
+    },
+    {
+        name: "Negative: OTP SMS",
+        sms: {
+            address: "VK-SBIINB",
+            body: "Your OTP for SBI Net Banking is 584920. Do not share this OTP with anyone. Valid for 10 mins."
+        },
+        expected: { valid: false }
+    },
+    {
+        name: "Negative: Postpaid Due Reminder",
+        sms: {
+            address: "VM-AIRTEL",
+            body: "Dear Customer, bill of Rs 1,450.00 for your Airtel postpaid is due on 22-Sep-26. Pay before due date to avoid late fee."
+        },
+        expected: { valid: false }
+    }
+];
+
+let failed = 0;
+for (const test of testMessages) {
+    const res = parseFinancialSms(test.sms);
+    if (!test.expected.valid) {
+        if (res !== null) {
+            console.error(`FAIL: ${test.name} should be rejected, but got:`, res);
+            failed++;
+        } else {
+            console.log(`PASS: ${test.name} correctly rejected.`);
+        }
+    } else {
+        if (res === null) {
+            console.error(`FAIL: ${test.name} was rejected!`);
+            failed++;
+        } else {
+            let ok = true;
+            if (test.expected.type && res.type !== test.expected.type) {
+                console.error(`FAIL [type]: ${test.name} got ${res.type}, expected ${test.expected.type}`);
+                ok = false;
+            }
+            if (test.expected.amount && res.amount !== test.expected.amount) {
+                console.error(`FAIL [amount]: ${test.name} got ${res.amount}, expected ${test.expected.amount}`);
+                ok = false;
+            }
+            if (test.expected.merchant && !res.merchant.toLowerCase().includes(test.expected.merchant.toLowerCase())) {
+                console.error(`FAIL [merchant]: ${test.name} got "${res.merchant}", expected "${test.expected.merchant}"`);
+                ok = false;
+            }
+            if (test.expected.category && res.category !== test.expected.category) {
+                console.error(`FAIL [category]: ${test.name} got "${res.category}", expected "${test.expected.category}"`);
+                ok = false;
+            }
+            if (test.expected.date && res.date !== test.expected.date) {
+                console.error(`FAIL [date]: ${test.name} got "${res.date}", expected "${test.expected.date}"`);
+                ok = false;
+            }
+            if (test.expected.account && res.account !== test.expected.account) {
+                console.error(`FAIL [account]: ${test.name} got "${res.account}", expected "${test.expected.account}"`);
+                ok = false;
+            }
+            if (ok) {
+                console.log(`PASS: ${test.name} -> ₹${res.amount} | ${res.type} | ${res.merchant} | ${res.category} | ${res.account} | ${res.date}`);
+            } else {
+                failed++;
+            }
+        }
+    }
+}
+
+if (failed === 0) {
+    console.log("\nALL TESTS PASSED WITH 100% ACCURACY!");
+} else {
+    console.error(`\n${failed} TESTS FAILED.`);
+    process.exit(1);
+}
