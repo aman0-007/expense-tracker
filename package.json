@@ -7,10 +7,13 @@
     "dev": "node server.js",
     "start": "node server.js",
     "lint": "node -c js/*.js",
-    "sync:android": "mkdir -p android/app/src/main/assets/public && cp -r index.html css js assets android/app/src/main/assets/public/",
-    "build": "mkdir -p dist && cp -r index.html css js assets dist/"
+    "sync:android": "mkdir -p android/app/src/main/assets/public && cp -r index.html css js assets manifest.json favicon.ico favicon.png android/app/src/main/assets/public/",
+    "build": "mkdir -p dist && cp -r index.html css js assets manifest.json favicon.ico favicon.png dist/"
   },
   "dependencies": {
     "express": "^4.21.2"
+  },
+  "devDependencies": {
+    "sharp": "^0.35.4"
   }
 }

@@ -153,15 +153,24 @@ input:focus, select:focus, textarea:focus {
     top: 24px;
     left: 50%;
     transform: translateX(-50%) translateY(-100px);
-    background-color: var(--text-main);
-    color: #FFFFFF;
+    background-color: #FFFFFF;
+    color: #1F2937;
     padding: 12px 24px;
     border-radius: 30px;
     font-size: 0.9rem;
-    font-weight: 500;
-    box-shadow: var(--shadow-soft);
+    font-weight: 600;
+    box-shadow: 0 12px 32px rgba(44, 54, 63, 0.16), 0 4px 8px rgba(44, 54, 63, 0.08);
     z-index: 300;
-    transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.2s ease, color 0.2s ease;
+    pointer-events: none;
+    border: 1px solid #E5E7EB;
+}
+
+[data-theme="dark"] .toast {
+    background-color: #242B36;
+    color: #F9FAFB;
+    border: 1px solid #3B4656;
+    box-shadow: 0 14px 32px rgba(0, 0, 0, 0.65);
 }
 
 .toast.show { transform: translateX(-50%) translateY(0); }
@@ -587,21 +596,31 @@ input:focus, select:focus, textarea:focus {
 .tx-account-badge {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
-    padding: 1px 6px;
+    gap: 5px;
+    padding: 2px 7px;
     background-color: var(--bg-secondary);
-    border: 1px solid var(--border-subtle);
-    border-radius: 4px;
-    font-size: 0.72rem;
+    border: 1px solid var(--border-soft);
+    border-radius: 6px;
+    font-size: 0.75rem;
     font-weight: 500;
     color: var(--text-muted);
     vertical-align: middle;
+    line-height: 1;
 }
 
 .tx-account-badge svg {
-    width: 12px;
-    height: 12px;
+    width: 14px;
+    height: 14px;
+    min-width: 14px;
+    min-height: 14px;
     flex-shrink: 0;
+    display: inline-block;
+}
+
+[data-theme="dark"] .tx-account-badge {
+    background-color: rgba(255, 255, 255, 0.06);
+    border-color: rgba(255, 255, 255, 0.1);
+    color: var(--text-muted);
 }
 
 /* =========================================================

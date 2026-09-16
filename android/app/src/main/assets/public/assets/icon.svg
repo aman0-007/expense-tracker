@@ -1,0 +1,84 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <!-- Background Gradient -->
+    <linearGradient id="bg-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0B0F19" />
+      <stop offset="50%" stop-color="#121826" />
+      <stop offset="100%" stop-color="#080C14" />
+    </linearGradient>
+
+    <!-- Emerald to Electric Cyan Gradient -->
+    <linearGradient id="accent-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00F5A0" />
+      <stop offset="100%" stop-color="#00D9F5" />
+    </linearGradient>
+
+    <!-- Radial Glow Atmosphere -->
+    <radialGradient id="aura" cx="50%" cy="46%" r="58%">
+      <stop offset="0%" stop-color="#00F5A0" stop-opacity="0.25" />
+      <stop offset="55%" stop-color="#00D9F5" stop-opacity="0.08" />
+      <stop offset="100%" stop-color="#000000" stop-opacity="0" />
+    </radialGradient>
+
+    <!-- Card Fill Gradient -->
+    <linearGradient id="card-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1A2333" stop-opacity="0.95" />
+      <stop offset="100%" stop-color="#0E1624" stop-opacity="0.98" />
+    </linearGradient>
+
+    <!-- Metallic Border Stroke Gradient -->
+    <linearGradient id="stroke-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38BDF8" stop-opacity="0.75" />
+      <stop offset="45%" stop-color="#34D399" stop-opacity="0.45" />
+      <stop offset="100%" stop-color="#1E293B" stop-opacity="0.8" />
+    </linearGradient>
+
+    <!-- Neon Header Line -->
+    <linearGradient id="glow-line" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#00F5A0" />
+      <stop offset="100%" stop-color="#00D9F5" />
+    </linearGradient>
+  </defs>
+
+  <!-- Squircle Base Canvas -->
+  <rect width="512" height="512" rx="116" fill="url(#bg-grad)" />
+  <rect width="512" height="512" rx="116" fill="url(#aura)" />
+  <rect x="2" y="2" width="508" height="508" rx="114" fill="none" stroke="rgba(255,255,255,0.12)" stroke-width="3" />
+
+  <!-- Concentric Orbital Tech Ring -->
+  <circle cx="256" cy="256" r="182" fill="none" stroke="url(#stroke-grad)" stroke-width="2.5" opacity="0.35" stroke-dasharray="10 8" />
+
+  <!-- Center Card / Wallet Vault Container -->
+  <g>
+    <!-- Card Body -->
+    <rect x="116" y="122" width="280" height="268" rx="38" fill="url(#card-grad)" stroke="url(#stroke-grad)" stroke-width="3.5" />
+
+    <!-- Top Card Glow Edge -->
+    <path d="M 154 124 L 358 124" stroke="url(#glow-line)" stroke-width="4.5" stroke-linecap="round" opacity="0.85" />
+
+    <!-- Mini Chip Graphic (Top Left) -->
+    <rect x="146" y="154" width="46" height="34" rx="8" fill="none" stroke="#34D399" stroke-width="2.5" opacity="0.85" />
+    <line x1="146" y1="171" x2="192" y2="171" stroke="#34D399" stroke-width="2" opacity="0.75" />
+    <line x1="169" y1="154" x2="169" y2="188" stroke="#34D399" stroke-width="2" opacity="0.75" />
+
+    <!-- Dynamic Growth Arrow (Top Right) -->
+    <path d="M 334 160 L 366 160 L 366 192 M 366 160 L 324 202" fill="none" stroke="url(#accent-grad)" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round" />
+
+    <!-- Centered Bold Glowing Rupee Symbol (₹) -->
+    <g transform="translate(256, 282) scale(1.18)">
+      <!-- Upper Crossbar -->
+      <path d="M -36 -48 L 36 -48" fill="none" stroke="url(#accent-grad)" stroke-width="9.5" stroke-linecap="round" />
+      <!-- Lower Crossbar -->
+      <path d="M -36 -26 L 24 -26" fill="none" stroke="url(#accent-grad)" stroke-width="9.5" stroke-linecap="round" />
+      <!-- Loop -->
+      <path d="M -16 -48 C 24 -48 26 -4 -16 -4 L -32 -4" fill="none" stroke="url(#accent-grad)" stroke-width="9.5" stroke-linecap="round" stroke-linejoin="round" />
+      <!-- Diagonal Leg -->
+      <path d="M -10 -6 L 32 46" fill="none" stroke="url(#accent-grad)" stroke-width="9.5" stroke-linecap="round" />
+    </g>
+
+    <!-- Bottom Status Indicators -->
+    <circle cx="152" cy="358" r="5" fill="#00F5A0" />
+    <circle cx="170" cy="358" r="5" fill="#38BDF8" opacity="0.75" />
+    <circle cx="188" cy="358" r="5" fill="#64748B" opacity="0.5" />
+  </g>
+</svg>

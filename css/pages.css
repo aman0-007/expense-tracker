@@ -168,25 +168,70 @@
 .filter-row {
     display: flex;
     gap: 8px;
-    padding: 16px 20px;
+    padding: 0 20px 8px;
     overflow-x: auto;
     scrollbar-width: none;
 }
 .filter-row::-webkit-scrollbar { display: none; }
 
+.filter-row.secondary-filters {
+    padding: 0 20px 10px;
+    gap: 8px;
+}
+
 .filter-chip {
-    padding: 8px 16px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 32px;
+    padding: 0 16px;
     background-color: var(--surface);
     border: 1px solid var(--border-soft);
-    border-radius: 20px;
-    font-size: 0.9rem;
+    border-radius: 100px;
+    font-size: 0.82rem;
+    font-weight: 500;
     color: var(--text-muted);
     white-space: nowrap;
+    cursor: pointer;
+    line-height: 1;
+    transition: all 0.15s ease;
 }
+
+.filter-chip:hover {
+    color: var(--text-main);
+    border-color: var(--border-subtle);
+}
+
+.filter-chip.small {
+    height: 28px;
+    padding: 0 12px;
+    font-size: 0.78rem;
+}
+
 .filter-chip.active {
     background-color: var(--accent);
-    color: #FFFFFF;
+    color: #FFFFFF !important;
     border-color: var(--accent);
+    font-weight: 600;
+    box-shadow: 0 2px 8px rgba(224, 122, 95, 0.25);
+}
+
+[data-theme="dark"] .filter-chip {
+    background-color: #1A1E26;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    color: #9CA3AF;
+}
+
+[data-theme="dark"] .filter-chip:hover {
+    color: #F3F4F6;
+    border-color: rgba(255, 255, 255, 0.22);
+}
+
+[data-theme="dark"] .filter-chip.active {
+    background-color: #E07A5F;
+    color: #FFFFFF !important;
+    border-color: #E07A5F;
+    box-shadow: 0 2px 10px rgba(224, 122, 95, 0.35);
 }
 
 .settings-section { 
@@ -390,20 +435,21 @@
     background-color: var(--surface);
     border: 1px solid var(--border-soft);
     border-radius: var(--radius-md);
-    padding: 0 16px;
-    margin-bottom: 16px;
+    padding: 0 14px;
+    margin-bottom: 10px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.02);
 }
 
-.search-box svg { color: var(--text-muted); width: 20px; height: 20px; margin-right: 8px; }
+.search-box svg { color: var(--text-muted); width: 18px; height: 18px; margin-right: 8px; flex-shrink: 0; }
 
 .search-box input {
     border: none;
     box-shadow: none;
     margin: 0;
-    padding: 14px 0;
+    padding: 10px 0;
     background: transparent;
     flex: 1;
+    font-size: 0.9rem;
 }
 
 .search-box input:focus { box-shadow: none; }
@@ -412,9 +458,13 @@
     font-size: 0.75rem;
     font-weight: 700;
     color: var(--text-muted);
-    margin: 24px 0 12px;
+    margin: 16px 0 8px;
     text-transform: uppercase;
     letter-spacing: 0.05em;
+}
+
+.transaction-history .date-heading:first-child {
+    margin-top: 4px;
 }
 
 /* ============================
@@ -1079,7 +1129,11 @@
 ============================ */
 
 .page-title-minimal {
-    padding: 32px 20px 16px;
+    padding: 24px 20px 12px;
+}
+
+#transactions-page .page-title-minimal {
+    padding: 20px 20px 8px;
 }
 
 .page-title-minimal h2 {
@@ -1087,6 +1141,7 @@
     color: var(--text-main);
     font-weight: 700;
     letter-spacing: -0.02em;
+    margin: 0;
 }
 
 /* Adjust the Analysis page to prevent double-spacing */
