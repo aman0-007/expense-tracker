@@ -1,0 +1,6 @@
+{
+  "summary":  "Comprehensive architecture and design plan to capture Samsung Pay & UPI app notifications alongside bank SMS, with a 15-minute sliding deduplication engine giving priority to bank SMS.",
+  "updatedAt":  "2026-10-11T16:41:13.971964702Z",
+  "requestFeedback":  true,
+  "userFacing":  true
+}

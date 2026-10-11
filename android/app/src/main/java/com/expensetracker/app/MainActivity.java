@@ -2,6 +2,7 @@ package com.expensetracker.app;
 
 import android.Manifest;
 import android.content.Context;
+import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.database.Cursor;
 import android.graphics.Color;
@@ -11,6 +12,7 @@ import android.os.Bundle;
 import android.os.VibrationEffect;
 import android.os.Vibrator;
 import android.os.VibratorManager;
+import android.provider.Settings;
 import android.view.View;
 import android.webkit.JavascriptInterface;
 import android.webkit.WebChromeClient;
@@ -23,6 +25,7 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
+import androidx.core.app.NotificationManagerCompat;
 import androidx.core.content.ContextCompat;
 
 import org.json.JSONArray;
@@ -112,6 +115,26 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
+    public static void dispatchIncomingNotification(String packageName, String title, String text, long timestamp) {
+        if (currentInstance == null) return;
+        MainActivity activity = currentInstance.get();
+        if (activity == null || activity.webView == null) return;
+
+        activity.runOnUiThread(() -> {
+            try {
+                JSONObject json = new JSONObject();
+                json.put("packageName", packageName);
+                json.put("title", title);
+                json.put("text", text);
+                json.put("date", timestamp);
+                String script = "if (window.onNativeNotificationReceived) { window.onNativeNotificationReceived(" + json.toString() + "); }";
+                activity.webView.evaluateJavascript(script, null);
+            } catch (Exception ignored) {
+                // Keep zero logging of financial details
+            }
+        });
+    }
+
     @Override
     public void onBackPressed() {
         if (webView != null && webView.canGoBack()) {
@@ -155,6 +178,25 @@ public class MainActivity extends AppCompatActivity {
             ActivityCompat.requestPermissions(MainActivity.this,
                     new String[]{Manifest.permission.READ_SMS, Manifest.permission.RECEIVE_SMS},
                     SMS_PERMISSION_REQUEST_CODE);
+        }
+
+        @JavascriptInterface
+        public boolean hasNotificationAccess() {
+            try {
+                return NotificationManagerCompat.getEnabledListenerPackages(context).contains(context.getPackageName());
+            } catch (Exception e) {
+                return false;
+            }
+        }
+
+        @JavascriptInterface
+        public void requestNotificationAccess() {
+            try {
+                Intent intent = new Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS);
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                context.startActivity(intent);
+            } catch (Exception ignored) {
+            }
         }
 
         @JavascriptInterface

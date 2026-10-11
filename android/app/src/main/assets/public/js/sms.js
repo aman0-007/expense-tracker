@@ -209,15 +209,17 @@ function onSmsArriveEvent(e) {
 }
 
 // Global callback invoked by Android native Java/Kotlin bridge
-window.onNativeSmsReceived = async function(smsData) {
-    if (!smsData) return;
-    try {
-        const parsed = typeof smsData === "string" ? JSON.parse(smsData) : smsData;
-        await handleIncomingSmsData(parsed);
-    } catch (_) {
-        // Suppress logging
-    }
-};
+if (typeof window !== "undefined") {
+    window.onNativeSmsReceived = async function(smsData) {
+        if (!smsData) return;
+        try {
+            const parsed = typeof smsData === "string" ? JSON.parse(smsData) : smsData;
+            await handleIncomingSmsData(parsed);
+        } catch (_) {
+            // Suppress logging
+        }
+    };
+}
 
 /**
  * Parses and saves incoming SMS transaction
@@ -243,7 +245,34 @@ async function handleIncomingSmsData(sms) {
         }
     }
 
-    // Check for duplicate transaction
+    // Check sliding 15-minute deduplication window against existing transactions
+    const matchingTx = typeof findMatchingRecentTransaction === "function" 
+        ? findMatchingRecentTransaction(parsedTx)
+        : null;
+
+    if (matchingTx) {
+        // If an app notification arrived first, upgrade it with official bank SMS details
+        if (matchingTx.source === "notification") {
+            matchingTx.account = parsedTx.account || matchingTx.account;
+            matchingTx.source = "sms";
+            matchingTx.smsId = parsedTx.smsId;
+            if (parsedTx.refNo) matchingTx.refNo = parsedTx.refNo;
+            if (parsedTx.balance !== undefined) matchingTx.balance = parsedTx.balance;
+            if (parsedTx.merchant && (!matchingTx.merchant || matchingTx.merchant === "UPI Payment")) {
+                matchingTx.merchant = parsedTx.merchant;
+                matchingTx.title = parsedTx.merchant;
+            }
+            matchingTx.updatedAt = new Date().toISOString();
+            await saveTransaction(matchingTx);
+            showToast(`Verified via Bank SMS (${matchingTx.account})`);
+            return;
+        }
+
+        // If existing transaction was already recorded via SMS, skip duplicate
+        return;
+    }
+
+    // Secondary legacy exact match check
     const exists = (AppState.transactions || []).some(t => {
         return (t.smsId && t.smsId === parsedTx.smsId) || 
                (t.amount === parsedTx.amount && t.date === parsedTx.date && t.merchant === parsedTx.merchant);
@@ -378,6 +407,28 @@ async function syncDeviceSmsInbox(forceFullSync = false, isSilent = false) {
         const hasIdMatch = parsedTx.smsId && existingIds.has(parsedTx.smsId);
         const hasSigMatch = existingSignatures.has(`${parsedTx.amount}_${parsedTx.date}_${parsedTx.merchant}`);
 
+        // Check if an earlier app notification recorded this within 15 minutes
+        const matchingNotif = (AppState.transactions || []).find(t => 
+            t.source === "notification" && 
+            t.type === parsedTx.type && 
+            Math.abs(Number(t.amount) - Number(parsedTx.amount)) <= 0.01 &&
+            Math.abs(new Date(t.createdAt || t.date).getTime() - new Date(parsedTx.createdAt || parsedTx.date).getTime()) <= (15 * 60 * 1000)
+        );
+
+        if (matchingNotif) {
+            matchingNotif.account = parsedTx.account || matchingNotif.account;
+            matchingNotif.source = "sms";
+            matchingNotif.smsId = parsedTx.smsId;
+            if (parsedTx.refNo) matchingNotif.refNo = parsedTx.refNo;
+            matchingNotif.updatedAt = new Date().toISOString();
+            if (typeof saveTransaction === "function") {
+                await saveTransaction(matchingNotif);
+            }
+            if (parsedTx.smsId) existingIds.add(parsedTx.smsId);
+            existingSignatures.add(`${parsedTx.amount}_${parsedTx.date}_${parsedTx.merchant}`);
+            continue;
+        }
+
         if (!hasIdMatch && !hasSigMatch) {
             newTransactionsToSave.push(parsedTx);
             if (parsedTx.smsId) existingIds.add(parsedTx.smsId);
@@ -410,16 +461,18 @@ async function syncDeviceSmsInbox(forceFullSync = false, isSilent = false) {
 /**
  * Android Permission Callback - called from MainActivity.java
  */
-window.onSmsPermissionResult = function(granted) {
-    if (granted) {
-        showToast("Permission granted! Scanning SMS inbox now...");
-        setTimeout(() => {
-            syncDeviceSmsInbox(true, false);
-        }, 300);
-    } else {
-        showToast("SMS permission denied. Enable in Phone Settings to auto-track.");
-    }
-};
+if (typeof window !== "undefined") {
+    window.onSmsPermissionResult = function(granted) {
+        if (granted) {
+            showToast("Permission granted! Scanning SMS inbox now...");
+            setTimeout(() => {
+                syncDeviceSmsInbox(true, false);
+            }, 300);
+        } else {
+            showToast("SMS permission denied. Enable in Phone Settings to auto-track.");
+        }
+    };
+}
 
 /**
  * Parse date string directly from SMS body text
@@ -781,6 +834,16 @@ function parseFinancialSms(sms) {
     // 10. Date parsing: from text or sms.date
     let txDate = getTodayString();
     let txTime = getCurrentTime();
+    let createdAtIso = new Date().toISOString();
+
+    if (sms.date) {
+        const d = new Date(sms.date);
+        if (!isNaN(d.getTime())) {
+            createdAtIso = d.toISOString();
+            txTime = d.toTimeString().split(" ")[0].slice(0, 5);
+        }
+    }
+
     const parsedTextDate = parseDateFromText(rawBody);
     if (parsedTextDate) {
         txDate = parsedTextDate;
@@ -788,7 +851,6 @@ function parseFinancialSms(sms) {
         const d = new Date(sms.date);
         if (!isNaN(d.getTime())) {
             txDate = d.toISOString().split("T")[0];
-            txTime = d.toTimeString().split(" ")[0].slice(0, 5);
         }
     }
 
@@ -805,14 +867,19 @@ function parseFinancialSms(sms) {
         note: `Synced from ${bankAccount} SMS`,
         source: "sms",
         smsId: String(sms.id || (sender + "_" + amount + "_" + txDate)),
-        createdAt: new Date().toISOString()
+        createdAt: createdAtIso
     };
 }
 
-document.addEventListener("DOMContentLoaded", () => {
-    // Non-blocking deferred init: Allows UI, charts, and first frame to render smoothly
-    const scheduleInit = window.requestIdleCallback || ((cb) => setTimeout(cb, 1500));
-    scheduleInit(() => {
-        initSmsTracking();
+if (typeof document !== "undefined") {
+    document.addEventListener("DOMContentLoaded", () => {
+        // Non-blocking deferred init: Allows UI, charts, and first frame to render smoothly
+        const scheduleInit = window.requestIdleCallback || ((cb) => setTimeout(cb, 1500));
+        scheduleInit(() => {
+            initSmsTracking();
+            if (typeof initNotificationTracking === "function") {
+                initNotificationTracking();
+            }
+        });
     });
-});
+}
